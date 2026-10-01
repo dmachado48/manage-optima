@@ -23,8 +23,12 @@ if (!secret) {
     const body = await response.text();
 
     if (!response.ok) {
+      const contentType = response.headers.get("content-type") ?? "";
+      const detail = contentType.includes("application/json")
+        ? body.slice(0, 500)
+        : "resposta não-JSON do servidor";
       console.error(
-        `${new Date().toISOString()} IMAP cron HTTP ${response.status}: ${body}`,
+        `${new Date().toISOString()} IMAP cron HTTP ${response.status}: ${detail}`,
       );
       process.exitCode = 1;
     } else {

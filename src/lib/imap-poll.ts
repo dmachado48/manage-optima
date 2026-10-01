@@ -102,7 +102,11 @@ function stableMessageId(
 
 function safeErrorMessage(error: unknown): string {
   if (!(error instanceof Error)) return "Erro desconhecido";
-  return error.message.replace(/\s+/g, " ").slice(0, 240);
+  const responseText =
+    "responseText" in error && typeof error.responseText === "string"
+      ? error.responseText
+      : "";
+  return (responseText || error.message).replace(/\s+/g, " ").slice(0, 240);
 }
 
 let runningPoll: Promise<ImapPollResult> | null = null;
