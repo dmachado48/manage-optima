@@ -4,7 +4,12 @@ import path from "path";
 const nextConfig: NextConfig = {
   // Keep Prisma out of the Turbopack bundle so `prisma generate` is picked up
   // after a server restart (avoids stale DMMF → "Unknown argument `active`").
-  serverExternalPackages: ["@prisma/client", "prisma"],
+  serverExternalPackages: [
+    "@prisma/client",
+    "imapflow",
+    "mailparser",
+    "prisma",
+  ],
   turbopack: {
     root: path.join(__dirname),
   },

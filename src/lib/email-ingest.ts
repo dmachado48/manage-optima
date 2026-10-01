@@ -22,6 +22,36 @@ export type IngestEmailResult = {
   matchReason: string | null;
 };
 
+function requestDescription(
+  input: IngestEmailInput,
+  maxBytes = 60_000,
+): string {
+  const description = [
+    `De: ${input.fromName ? `${input.fromName} <${input.fromAddress}>` : input.fromAddress}`,
+    input.toAddress ? `Para: ${input.toAddress}` : null,
+    "",
+    input.bodyText,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
+
+  if (Buffer.byteLength(description, "utf8") <= maxBytes) return description;
+
+  const suffix = "\n\n[Conteúdo truncado; o email completo está disponível no Inbox.]";
+  const targetBytes = maxBytes - Buffer.byteLength(suffix, "utf8");
+  let bytes = 0;
+  let truncated = "";
+
+  for (const character of description) {
+    const characterBytes = Buffer.byteLength(character, "utf8");
+    if (bytes + characterBytes > targetBytes) break;
+    truncated += character;
+    bytes += characterBytes;
+  }
+
+  return truncated + suffix;
+}
+
 export async function ingestInboundEmail(
   input: IngestEmailInput,
 ): Promise<IngestEmailResult> {
@@ -51,14 +81,7 @@ export async function ingestInboundEmail(
       data: {
         clientId: match.clientId,
         title: titleFromSubject(input.subject),
-        description: [
-          `De: ${input.fromName ? `${input.fromName} <${input.fromAddress}>` : input.fromAddress}`,
-          input.toAddress ? `Para: ${input.toAddress}` : null,
-          "",
-          input.bodyText,
-        ]
-          .filter((l) => l !== null)
-          .join("\n"),
+        description: requestDescription(input),
         source: "email",
         status: "requested",
         emailMessageId: messageId,
