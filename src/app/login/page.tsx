@@ -1,11 +1,19 @@
 "use client";
 
 import { Button } from "@heroui/react";
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { loginAction } from "@/app/actions/auth";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [state, action, pending] = useActionState(loginAction, undefined);
+
+  useEffect(() => {
+    if (!state?.success) return;
+    router.replace("/");
+    router.refresh();
+  }, [router, state?.success]);
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-sm flex-1 flex-col justify-center gap-6 px-4 py-12">
