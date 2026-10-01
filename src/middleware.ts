@@ -22,6 +22,10 @@ export async function middleware(request: NextRequest) {
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
+    // Auth.js prefixes the production HTTPS cookie with `__Secure-`.
+    // Without this, getToken looks for the development cookie name and
+    // redirects an already authenticated user back to /login.
+    secureCookie: process.env.NODE_ENV === "production",
   });
 
   if (!token || token.role !== "admin") {
