@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
     root: path.join(__dirname),
   },
   experimental: {
+    // Shared cPanel limits process/thread creation. Keep build-time page-data
+    // collection to one worker so Turbopack does not hit EAGAIN / SIGABRT.
+    cpus: 1,
     serverActions: {
       bodySizeLimit: "12mb",
     },
