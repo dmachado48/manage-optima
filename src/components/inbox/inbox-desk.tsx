@@ -106,7 +106,7 @@ export function InboxDesk({
               <li key={item.id} className="border-b border-border last:border-0">
                 <details className="group">
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2.5 hover:bg-default/60">
-                    <div className="min-w-0 w-44 shrink-0 max-sm:hidden">
+                    <div className="min-w-0 w-32 shrink-0 sm:w-44">
                       <p className="truncate text-xs font-medium">
                         {item.fromName || item.fromAddress}
                       </p>
