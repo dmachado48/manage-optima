@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
-import { ingestInboundEmail } from "@/lib/email-ingest";
+import {
+  ingestInboundEmail,
+  requestDescription,
+} from "@/lib/email-ingest";
 import { titleFromSubject } from "@/lib/email-match";
 import { prisma } from "@/lib/prisma";
 
@@ -16,36 +19,77 @@ export async function assignInboundToClient(
 
   const inbound = await prisma.inboundEmail.findUnique({
     where: { id: inboundId },
+    include: { attachments: true },
   });
   if (!inbound) throw new Error("Email não encontrado");
   if (inbound.requestId) throw new Error("Já está ligado a um pedido");
 
-  const request = await prisma.request.create({
-    data: {
-      clientId,
-      title: titleFromSubject(inbound.subject),
-      description: [
-        `De: ${inbound.fromName ? `${inbound.fromName} <${inbound.fromAddress}>` : inbound.fromAddress}`,
-        inbound.toAddress ? `Para: ${inbound.toAddress}` : null,
-        "",
-        inbound.bodyText,
-      ]
-        .filter((l) => l !== null)
-        .join("\n"),
-      source: "email",
-      status: "requested",
-      emailMessageId: inbound.messageId,
-    },
-  });
+  await prisma.$transaction(async (tx) => {
+    const createdRequest = await tx.request.create({
+      data: {
+        clientId,
+        title: titleFromSubject(inbound.subject),
+        description: requestDescription({
+          messageId: inbound.messageId,
+          fromAddress: inbound.fromAddress,
+          fromName: inbound.fromName,
+          toAddress: inbound.toAddress,
+          subject: inbound.subject,
+          bodyText: inbound.bodyText,
+        }),
+        source: "email",
+        status: "requested",
+        emailMessageId: inbound.messageId,
+      },
+    });
+    const message = await tx.requestMessage.create({
+      data: {
+        requestId: createdRequest.id,
+        author: "client",
+        body: inbound.bodyText,
+        bodyHtml: inbound.bodyHtml,
+        emailMessageId: inbound.messageId,
+        createdAt: inbound.receivedAt,
+      },
+    });
 
-  await prisma.inboundEmail.update({
-    where: { id: inboundId },
-    data: {
-      status: "assigned",
-      matchedClientId: clientId,
-      requestId: request.id,
-      matchReason: "manual_assign",
-    },
+    if (inbound.attachments.length > 0) {
+      await tx.requestAttachment.createMany({
+        data: inbound.attachments.map((attachment) => ({
+          requestId: createdRequest.id,
+          messageId: message.id,
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType,
+          sizeBytes: attachment.sizeBytes,
+          storageKey: attachment.storageKey,
+          uploadedBy: "client",
+        })),
+      });
+      await tx.inboundEmailAttachment.deleteMany({
+        where: { inboundEmailId: inbound.id },
+      });
+    }
+
+    await tx.clientEmailAlias.upsert({
+      where: { email: inbound.fromAddress.trim().toLowerCase() },
+      update: { clientId },
+      create: {
+        clientId,
+        email: inbound.fromAddress.trim().toLowerCase(),
+      },
+    });
+
+    await tx.inboundEmail.update({
+      where: { id: inboundId },
+      data: {
+        status: "assigned",
+        matchedClientId: clientId,
+        requestId: createdRequest.id,
+        matchReason: "manual_assign",
+      },
+    });
+
+    return createdRequest;
   });
 
   revalidatePath("/inbox");

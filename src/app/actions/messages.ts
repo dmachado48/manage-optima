@@ -3,13 +3,21 @@
 import { revalidatePath } from "next/cache";
 import type { MessageAuthor } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
+import {
+  cleanEmailHtml,
+  emailTextFromHtml,
+  outboundEmailHtml,
+} from "@/lib/email-html";
+import { boundedMessageId } from "@/lib/email-ingest";
 import { prisma } from "@/lib/prisma";
-import { storeUpload } from "@/lib/uploads";
+import { sendSupportEmail } from "@/lib/support-email";
+import { assertAllowedUpload, storeUpload } from "@/lib/uploads";
 
 export type RequestThreadMessage = {
   id: string;
   author: MessageAuthor;
   body: string;
+  bodyHtml: string | null;
   createdAt: string;
   attachments: {
     id: string;
@@ -28,6 +36,7 @@ export type RequestThread = {
   createdAt: string;
   updatedAt: string;
   client: { id: string; name: string; email: string | null };
+  emailRecipient: string | null;
   messages: RequestThreadMessage[];
   looseAttachments: {
     id: string;
@@ -53,6 +62,11 @@ async function loadThread(requestId: string): Promise<RequestThread> {
     where: { id: requestId },
     include: {
       client: { select: { id: true, name: true, email: true } },
+      inboundEmails: {
+        orderBy: { receivedAt: "desc" },
+        take: 1,
+        select: { fromAddress: true },
+      },
       messages: {
         orderBy: { createdAt: "asc" },
         include: {
@@ -95,9 +109,14 @@ async function loadThread(requestId: string): Promise<RequestThread> {
       id: m.id,
       author: m.author,
       body: m.body,
+      bodyHtml: m.bodyHtml,
       createdAt: m.createdAt.toISOString(),
       attachments: m.attachments,
     })),
+    emailRecipient:
+      request.source === "email"
+        ? request.inboundEmails[0]?.fromAddress || request.client.email
+        : null,
     looseAttachments: request.attachments.map((a) => ({
       id: a.id,
       fileName: a.fileName,
@@ -169,7 +188,12 @@ function collectFiles(formData: FormData): File[] {
 export async function postRequestMessage(formData: FormData) {
   await requireAdmin();
   const requestId = String(formData.get("requestId") ?? "");
-  const body = String(formData.get("body") ?? "").trim();
+  const submittedBody = String(formData.get("body") ?? "").trim();
+  const submittedHtml = String(formData.get("bodyHtml") ?? "").trim();
+  const bodyHtml = cleanEmailHtml(submittedHtml);
+  const body = (
+    submittedBody || (bodyHtml ? emailTextFromHtml(bodyHtml) : "")
+  ).trim();
   const files = collectFiles(formData);
 
   if (!requestId) throw new Error("Pedido obrigatório");
@@ -179,22 +203,100 @@ export async function postRequestMessage(formData: FormData) {
 
   const request = await prisma.request.findUnique({
     where: { id: requestId },
-    select: { id: true, clientId: true },
+    select: {
+      id: true,
+      clientId: true,
+      title: true,
+      source: true,
+      emailMessageId: true,
+      client: { select: { email: true } },
+      inboundEmails: {
+        orderBy: { receivedAt: "desc" },
+        take: 1,
+        select: { fromAddress: true, messageId: true },
+      },
+      messages: {
+        where: { emailMessageId: { not: null } },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: { emailMessageId: true },
+      },
+    },
   });
   if (!request) throw new Error("Pedido não encontrado");
+
+  let outgoingMessageId: string | null = null;
+  if (request.source === "email") {
+    const recipient =
+      request.inboundEmails[0]?.fromAddress || request.client.email;
+    if (!recipient) {
+      throw new Error("O pedido não tem um destinatário de email");
+    }
+
+    const safeHtml =
+      bodyHtml ||
+      `<p>${(body || "(anexo)")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\n", "<br>")}</p>`;
+    const references = Array.from(
+      new Set(
+        [
+          request.emailMessageId,
+          ...request.messages
+            .map((message) => message.emailMessageId)
+            .reverse(),
+        ].filter((value): value is string => Boolean(value)),
+      ),
+    );
+    const inReplyTo =
+      request.messages[0]?.emailMessageId ||
+      request.inboundEmails[0]?.messageId ||
+      request.emailMessageId;
+    const emailAttachments = await Promise.all(
+      files.map(async (file) => {
+        const contentType = assertAllowedUpload(file);
+        return {
+          filename: file.name,
+          content: Buffer.from(await file.arrayBuffer()),
+          contentType,
+        };
+      }),
+    );
+    const sent = await sendSupportEmail({
+      to: recipient,
+      subject: /^re:/i.test(request.title)
+        ? request.title
+        : `Re: ${request.title}`,
+      html: outboundEmailHtml(safeHtml),
+      text: body || "(anexo)",
+      inReplyTo,
+      references,
+      attachments: emailAttachments,
+    });
+    outgoingMessageId = boundedMessageId(sent.messageId);
+  }
 
   const message = await prisma.requestMessage.create({
     data: {
       requestId,
       author: "admin",
       body: body || "(anexo)",
+      bodyHtml,
+      emailMessageId: outgoingMessageId,
     },
   });
 
   await saveFiles(requestId, message.id, "admin", files);
   await prisma.request.update({
     where: { id: requestId },
-    data: { updatedAt: new Date() },
+    data: {
+      updatedAt: new Date(),
+      ...(request.source === "email"
+        ? { status: "waiting_on_client" as const }
+        : {}),
+    },
   });
 
   revalidateRequestPaths(request.clientId);

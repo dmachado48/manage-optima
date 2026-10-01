@@ -38,6 +38,13 @@ export async function POST(request: Request) {
   const bodyText = String(body.bodyText ?? body.text ?? "").trim();
   const toAddress = String(body.toAddress ?? body.to ?? "").trim() || null;
   const fromName = String(body.fromName ?? "").trim() || null;
+  const inReplyTo = String(body.inReplyTo ?? "").trim() || null;
+  const bodyHtml = String(body.bodyHtml ?? body.html ?? "").trim() || null;
+  const references = Array.isArray(body.references)
+    ? body.references.map(String)
+    : body.references
+      ? [String(body.references)]
+      : [];
 
   if (!messageId || !fromAddress || !subject) {
     return NextResponse.json(
@@ -51,8 +58,11 @@ export async function POST(request: Request) {
     fromAddress,
     fromName,
     toAddress,
+    inReplyTo,
+    references,
     subject,
     bodyText: bodyText || subject,
+    bodyHtml,
     receivedAt: body.receivedAt ? new Date(String(body.receivedAt)) : undefined,
   });
 

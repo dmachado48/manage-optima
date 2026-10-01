@@ -54,6 +54,7 @@ export function RequestDetailModal({
   const [pending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
 
   function refresh() {
     startTransition(async () => {
@@ -93,6 +94,9 @@ export function RequestDetailModal({
         const fd = new FormData();
         fd.set("requestId", requestId);
         fd.set("body", body);
+        if (mode === "admin" && editorRef.current) {
+          fd.set("bodyHtml", editorRef.current.innerHTML);
+        }
         if (mode === "portal" && portalToken) fd.set("token", portalToken);
         if (files) {
           Array.from(files).forEach((f) => fd.append("files", f));
@@ -103,6 +107,7 @@ export function RequestDetailModal({
             : await postPortalRequestMessage(fd);
         setThread(next);
         setBody("");
+        if (editorRef.current) editorRef.current.innerHTML = "";
         setFiles(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
         onChanged?.();
@@ -119,6 +124,19 @@ export function RequestDetailModal({
       refresh();
       onChanged?.();
     });
+  }
+
+  function format(command: string, value?: string) {
+    editorRef.current?.focus();
+    document.execCommand(command, false, value);
+    if (editorRef.current) {
+      setBody(editorRef.current.innerText.trim());
+    }
+  }
+
+  function addLink() {
+    const url = window.prompt("Endereço do link");
+    if (url?.trim()) format("createLink", url.trim());
   }
 
   return (
@@ -159,7 +177,8 @@ export function RequestDetailModal({
         ) : (
           <>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-3">
-              {thread.description ? (
+              {thread.description &&
+              (thread.source !== "email" || thread.messages.length === 0) ? (
                 <p className="rounded-lg bg-default px-3 py-2 text-sm text-foreground/90">
                   {thread.description}
                 </p>
@@ -244,7 +263,14 @@ export function RequestDetailModal({
                             {formatWhen(m.createdAt)}
                           </span>
                         </div>
-                        <p className="whitespace-pre-wrap text-sm">{m.body}</p>
+                        {m.bodyHtml ? (
+                          <div
+                            className="email-content text-sm [&_a]:text-accent [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1 [&_ul]:list-disc [&_ul]:pl-5"
+                            dangerouslySetInnerHTML={{ __html: m.bodyHtml }}
+                          />
+                        ) : (
+                          <p className="whitespace-pre-wrap text-sm">{m.body}</p>
+                        )}
                         {m.attachments.length > 0 ? (
                           <ul className="mt-2 space-y-1">
                             {m.attachments.map((a) => (
@@ -271,17 +297,63 @@ export function RequestDetailModal({
 
             <footer className="shrink-0 border-t border-border px-4 py-3">
               <div className="flex flex-col gap-2">
-                <textarea
-                  className="min-h-20 w-full rounded-md border border-border bg-[var(--field-background)] px-3 py-2 text-sm"
-                  placeholder={
-                    mode === "admin"
-                      ? "Mensagem para o cliente…"
-                      : "Mensagem para a Webiton…"
-                  }
-                  value={body}
-                  onChange={(e) => setBody(e.target.value)}
-                  disabled={pending}
-                />
+                {mode === "admin" ? (
+                  <>
+                    {thread.emailRecipient ? (
+                      <p className="text-[11px] text-muted">
+                        Responder por email a {thread.emailRecipient}
+                      </p>
+                    ) : null}
+                    <div className="flex items-center gap-1 rounded-t-md border border-b-0 border-border bg-default px-2 py-1">
+                      {[
+                        ["B", "bold"],
+                        ["I", "italic"],
+                        ["U", "underline"],
+                        ["• Lista", "insertUnorderedList"],
+                        ["1. Lista", "insertOrderedList"],
+                      ].map(([label, command]) => (
+                        <button
+                          key={command}
+                          type="button"
+                          className="rounded px-2 py-1 text-xs hover:bg-surface"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => format(command)}
+                          disabled={pending}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="rounded px-2 py-1 text-xs hover:bg-surface"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={addLink}
+                        disabled={pending}
+                      >
+                        Link
+                      </button>
+                    </div>
+                    <div
+                      ref={editorRef}
+                      contentEditable={!pending}
+                      role="textbox"
+                      aria-multiline="true"
+                      data-placeholder="Mensagem para o cliente…"
+                      className="min-h-24 w-full overflow-y-auto rounded-b-md border border-border bg-[var(--field-background)] px-3 py-2 text-sm outline-none empty:before:pointer-events-none empty:before:text-muted empty:before:content-[attr(data-placeholder)] focus:border-accent"
+                      onInput={(event) =>
+                        setBody(event.currentTarget.innerText.trim())
+                      }
+                    />
+                  </>
+                ) : (
+                  <textarea
+                    className="min-h-20 w-full rounded-md border border-border bg-[var(--field-background)] px-3 py-2 text-sm"
+                    placeholder="Mensagem para a Webiton…"
+                    value={body}
+                    onChange={(e) => setBody(e.target.value)}
+                    disabled={pending}
+                  />
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                   <input
                     ref={fileInputRef}
@@ -297,7 +369,11 @@ export function RequestDetailModal({
                     isDisabled={pending || (!body.trim() && !files?.length)}
                     onPress={send}
                   >
-                    {pending ? "A enviar…" : "Enviar"}
+                    {pending
+                      ? "A enviar…"
+                      : mode === "admin" && thread.source === "email"
+                        ? "Enviar email"
+                        : "Enviar"}
                   </Button>
                 </div>
                 {sendError ? (

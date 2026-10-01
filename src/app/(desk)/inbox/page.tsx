@@ -12,12 +12,32 @@ export default async function InboxPage() {
     }),
     prisma.inboundEmail.findMany({
       where: { status: "pending" },
-      include: { matchedClient: { select: { id: true, name: true } } },
+      include: {
+        matchedClient: { select: { id: true, name: true } },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            mimeType: true,
+            sizeBytes: true,
+          },
+        },
+      },
       orderBy: { receivedAt: "desc" },
     }),
     prisma.inboundEmail.findMany({
       where: { status: { not: "pending" } },
-      include: { matchedClient: { select: { id: true, name: true } } },
+      include: {
+        matchedClient: { select: { id: true, name: true } },
+        attachments: {
+          select: {
+            id: true,
+            fileName: true,
+            mimeType: true,
+            sizeBytes: true,
+          },
+        },
+      },
       orderBy: { receivedAt: "desc" },
       take: 20,
     }),
@@ -35,6 +55,7 @@ export default async function InboxPage() {
     matchReason: r.matchReason,
     matchedClient: r.matchedClient,
     requestId: r.requestId,
+    attachments: r.attachments,
   });
 
   return (

@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "@prisma/client",
     "imapflow",
     "mailparser",
+    "nodemailer",
     "prisma",
   ],
   turbopack: {

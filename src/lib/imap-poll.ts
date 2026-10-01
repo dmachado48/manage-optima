@@ -5,7 +5,10 @@ import { createHash } from "node:crypto";
 import { ImapFlow } from "imapflow";
 import { simpleParser, type AddressObject, type ParsedMail } from "mailparser";
 
-import { ingestInboundEmail } from "@/lib/email-ingest";
+import {
+  boundedMessageId,
+  ingestInboundEmail,
+} from "@/lib/email-ingest";
 
 const DEFAULT_BATCH_SIZE = 25;
 const DEFAULT_MAX_MESSAGE_BYTES = 20 * 1024 * 1024;
@@ -95,9 +98,7 @@ function stableMessageId(
 ): string {
   const candidate = parsed.messageId?.trim() || envelopeMessageId?.trim();
   if (!candidate) return fallback;
-  if (candidate.length <= 180) return candidate;
-
-  return `sha256:${createHash("sha256").update(candidate).digest("hex")}`;
+  return boundedMessageId(candidate);
 }
 
 function safeErrorMessage(error: unknown): string {
@@ -235,11 +236,23 @@ async function runImapPoll(): Promise<ImapPollResult> {
           fromAddress: from.address,
           fromName: from.name,
           toAddress: to.address,
+          inReplyTo: parsed.inReplyTo ?? null,
+          references: Array.isArray(parsed.references)
+            ? parsed.references
+            : parsed.references
+              ? [parsed.references]
+              : [],
           subject:
             parsed.subject?.trim() ||
             message.envelope?.subject?.trim() ||
             "(Sem assunto)",
           bodyText: body,
+          bodyHtml: typeof parsed.html === "string" ? parsed.html : null,
+          attachments: parsed.attachments.map((attachment, index) => ({
+            fileName: attachment.filename || `anexo-${index + 1}`,
+            mimeType: attachment.contentType || "application/octet-stream",
+            content: attachment.content,
+          })),
           receivedAt:
             validDate(parsed.date) ??
             validDate(message.envelope?.date) ??

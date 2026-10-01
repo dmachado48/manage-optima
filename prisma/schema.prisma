@@ -124,9 +124,20 @@ model Client {
   reports       Report[]
   projects      Project[]
   inboundEmails InboundEmail[]
+  emailAliases  ClientEmailAlias[]
 
   @@index([active, name])
   @@index([relation, name])
+}
+
+model ClientEmailAlias {
+  id        String   @id @default(cuid())
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  email     String   @unique
+  createdAt DateTime @default(now())
+
+  @@index([clientId])
 }
 
 model Contract {
@@ -176,13 +187,15 @@ model Request {
 }
 
 model RequestMessage {
-  id          String              @id @default(cuid())
-  requestId   String
-  request     Request             @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  author      MessageAuthor
-  body        String              @db.Text
-  createdAt   DateTime            @default(now())
-  attachments RequestAttachment[]
+  id             String              @id @default(cuid())
+  requestId      String
+  request        Request             @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  author         MessageAuthor
+  body           String              @db.LongText
+  bodyHtml       String?             @db.LongText
+  emailMessageId String?             @unique
+  createdAt      DateTime            @default(now())
+  attachments    RequestAttachment[]
 
   @@index([requestId, createdAt])
 }
@@ -205,25 +218,41 @@ model RequestAttachment {
 }
 
 model InboundEmail {
-  id              String             @id @default(cuid())
-  messageId       String             @unique
+  id              String                   @id @default(cuid())
+  messageId       String                   @unique
   fromAddress     String
   fromName        String?
   toAddress       String?
   subject         String
-  bodyText        String             @db.LongText
-  receivedAt      DateTime           @default(now())
-  status          InboundEmailStatus @default(pending)
+  bodyText        String                   @db.LongText
+  bodyHtml        String?                  @db.LongText
+  receivedAt      DateTime                 @default(now())
+  status          InboundEmailStatus       @default(pending)
   matchedClientId String?
-  matchedClient   Client?            @relation(fields: [matchedClientId], references: [id])
-  requestId       String?            @unique
-  request         Request?           @relation(fields: [requestId], references: [id])
+  matchedClient   Client?                  @relation(fields: [matchedClientId], references: [id])
+  requestId       String?
+  request         Request?                 @relation(fields: [requestId], references: [id])
   matchReason     String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  attachments     InboundEmailAttachment[]
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
 
   @@index([status, receivedAt])
   @@index([fromAddress])
+  @@index([requestId, receivedAt])
+}
+
+model InboundEmailAttachment {
+  id             String       @id @default(cuid())
+  inboundEmailId String
+  inboundEmail   InboundEmail @relation(fields: [inboundEmailId], references: [id], onDelete: Cascade)
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  storageKey     String
+  createdAt      DateTime     @default(now())
+
+  @@index([inboundEmailId])
 }
 
 model Intervention {

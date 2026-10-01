@@ -15,6 +15,20 @@ function domainOf(email: string): string | null {
   return email.slice(at + 1);
 }
 
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "hotmail.com",
+  "hotmail.pt",
+  "outlook.com",
+  "outlook.pt",
+  "live.com",
+  "icloud.com",
+  "me.com",
+  "yahoo.com",
+  "yahoo.fr",
+  "sapo.pt",
+]);
+
 /**
  * Extract routing token from:
  * - requests+TOKEN@webiton.pt (plus-addressing)
@@ -36,8 +50,9 @@ export function extractRoutingToken(
 /**
  * Match order:
  * 1. To token → Client.kanbanShareToken (área do cliente)
- * 2. From email → Client.email
- * 3. From domain → Client.domain
+ * 2. From email → learned sender alias
+ * 3. From email → Client.email
+ * 4. From domain → Client.domain or Client.email domain
  */
 export async function matchClientForInbound(input: {
   fromAddress: string;
@@ -56,6 +71,14 @@ export async function matchClientForInbound(input: {
     }
   }
 
+  const byAlias = await prisma.clientEmailAlias.findUnique({
+    where: { email: from },
+    select: { clientId: true },
+  });
+  if (byAlias) {
+    return { clientId: byAlias.clientId, reason: "learned_sender" };
+  }
+
   const byEmail = await prisma.client.findFirst({
     where: { email: from },
     select: { id: true },
@@ -65,13 +88,16 @@ export async function matchClientForInbound(input: {
   }
 
   const domain = domainOf(from);
-  if (domain) {
+  if (domain && !PUBLIC_EMAIL_DOMAINS.has(domain)) {
     const byDomain = await prisma.client.findFirst({
-      where: { domain },
+      where: {
+        OR: [{ domain }, { email: { endsWith: `@${domain}` } }],
+      },
       select: { id: true },
+      orderBy: { domain: "desc" },
     });
     if (byDomain) {
-      return { clientId: byDomain.id, reason: "from_domain" };
+      return { clientId: byDomain.id, reason: "from_domain_or_client_email" };
     }
   }
 
