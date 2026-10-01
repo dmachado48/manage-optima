@@ -36,7 +36,9 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-npm ci
+# cPanel exports NODE_ENV=production, but Tailwind/TypeScript are required
+# while creating the production build.
+npm ci --include=dev
 npx prisma generate
 npx prisma db push
 npm run build
