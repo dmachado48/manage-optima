@@ -105,8 +105,8 @@ export function InboxDesk({
             {pending.map((item) => (
               <li key={item.id} className="border-b border-border last:border-0">
                 <details className="group">
-                  <summary className="grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_auto] gap-3 px-3 py-2.5 hover:bg-default/60 sm:grid-cols-[12rem_minmax(0,1fr)_auto]">
-                    <div className="min-w-0">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-3 py-2.5 hover:bg-default/60">
+                    <div className="min-w-0 w-44 shrink-0 max-sm:hidden">
                       <p className="truncate text-xs font-medium">
                         {item.fromName || item.fromAddress}
                       </p>
@@ -114,7 +114,7 @@ export function InboxDesk({
                         {item.fromAddress}
                       </p>
                     </div>
-                    <div className="min-w-0 max-sm:col-span-2 max-sm:row-start-2">
+                    <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">
                         {item.subject}
                       </p>
@@ -122,7 +122,7 @@ export function InboxDesk({
                         {item.bodyText.replace(/\s+/g, " ").slice(0, 150)}
                       </p>
                     </div>
-                    <div className="flex items-start gap-2 text-[11px] text-muted">
+                    <div className="flex shrink-0 items-start gap-2 text-[11px] text-muted">
                       {item.attachments.length > 0 ? (
                         <span>📎 {item.attachments.length}</span>
                       ) : null}
