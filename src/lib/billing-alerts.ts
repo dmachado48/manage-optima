@@ -1,30 +1,52 @@
 import "server-only";
 
 import { isPackAtLimit, type BillingAlert } from "@/lib/billing";
+import { getPlatformConfig } from "@/lib/platform-config";
 import { prisma } from "@/lib/prisma";
 
 export async function getBillingAlerts(): Promise<BillingAlert[]> {
-  const [contracts, projects, billableGroups] = await Promise.all([
-    prisma.contract.findMany({
-      where: {
-        active: true,
-        billedAt: null,
-        type: { in: ["pack", "retainer"] },
-      },
-      include: { client: { select: { id: true, name: true } } },
-    }),
-    prisma.project.findMany({
-      where: { status: "delivered", billedAt: null },
-      include: { client: { select: { id: true, name: true } } },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.intervention.groupBy({
-      by: ["clientId"],
-      where: { billingStatus: "billable" },
-      _count: { _all: true },
-      _sum: { minutes: true },
-    }),
-  ]);
+  const config = await getPlatformConfig();
+
+  const [contracts, projects, billableGroups, overdueProjects] =
+    await Promise.all([
+      config.alertAttainedEnabled
+        ? prisma.contract.findMany({
+            where: {
+              active: true,
+              billedAt: null,
+              type: { in: ["pack", "retainer"] },
+            },
+            include: { client: { select: { id: true, name: true } } },
+          })
+        : Promise.resolve([]),
+      config.alertBillableEnabled
+        ? prisma.project.findMany({
+            where: { status: "delivered", billedAt: null },
+            include: { client: { select: { id: true, name: true } } },
+            orderBy: { updatedAt: "desc" },
+          })
+        : Promise.resolve([]),
+      config.alertBillableEnabled
+        ? prisma.intervention.groupBy({
+            by: ["clientId"],
+            where: { billingStatus: "billable" },
+            _count: { _all: true },
+            _sum: { minutes: true },
+          })
+        : Promise.resolve([]),
+      config.alertDeadlineEnabled
+        ? prisma.project.findMany({
+            where: {
+              deadline: { lt: new Date() },
+              status: { notIn: ["delivered", "cancelled"] },
+              billedAt: null,
+            },
+            include: { client: { select: { id: true, name: true } } },
+            orderBy: { deadline: "asc" },
+            take: 20,
+          })
+        : Promise.resolve([]),
+    ]);
 
   const alerts: BillingAlert[] = [];
 
@@ -35,6 +57,7 @@ export async function getBillingAlerts(): Promise<BillingAlert[]> {
     alerts.push({
       id: `contract:${c.id}`,
       kind: "pack",
+      category: "attained",
       clientId: c.client.id,
       clientName: c.client.name,
       label: c.type === "pack" ? "Pack esgotado" : "Avença no limite",
@@ -50,6 +73,7 @@ export async function getBillingAlerts(): Promise<BillingAlert[]> {
     alerts.push({
       id: `project:${p.id}`,
       kind: "project",
+      category: "billable",
       clientId: p.client.id,
       clientName: p.client.name,
       label: "Projeto entregue",
@@ -67,11 +91,25 @@ export async function getBillingAlerts(): Promise<BillingAlert[]> {
     alerts.push({
       id: "interventions:billable",
       kind: "interventions",
+      category: "billable",
       clientId: "",
       clientName: `${billableGroups.length} cliente(s)`,
       label: "Intervenções por faturar",
       detail: `${totalRows} registos · ${(totalMinutes / 60).toFixed(1)}h`,
       href: "/settings?tab=interventions",
+    });
+  }
+
+  for (const p of overdueProjects) {
+    alerts.push({
+      id: `deadline:${p.id}`,
+      kind: "deadline",
+      category: "deadline",
+      clientId: p.client.id,
+      clientName: p.client.name,
+      label: "Deadline ultrapassado",
+      detail: `${p.title}${p.deadline ? ` · ${p.deadline.toLocaleDateString("pt-PT")}` : ""}`,
+      href: `/projects/${p.id}`,
     });
   }
 

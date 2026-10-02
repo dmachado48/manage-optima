@@ -39,6 +39,25 @@ Open [http://localhost:3000](http://localhost:3000). Login with `ADMIN_EMAIL` / 
 | `npx prisma migrate dev` | Migrations (needs CREATE DATABASE privilege) |
 | `npm run db:seed` | Admin + demo client/pack/requests |
 | `npx prisma studio` | Browse data |
+| `npm run deploy` | Push `main` + build/restart on manage.webiton.pt |
+| `npm run deploy:remote` | Pull/build/restart no servidor (sem push) |
+
+## Deploy (produção)
+
+Pré-requisitos: SSH `webiton.pt` (user `webitonc`), repo em `~/apps/manage-optima`, `.env` de produção no servidor.
+
+```bash
+# 1. Commit local
+git add -A && git commit -m "…"
+
+# 2. Push + deploy (prisma db push + build + Passenger restart)
+npm run deploy
+
+# Só rebuild no servidor (código já no GitHub)
+npm run deploy:remote
+```
+
+Overrides opcionais: `REMOTE_HOST`, `REMOTE_DIR`, `BRANCH`, `APP_URL`.
 
 ## Phase 1 (done)
 

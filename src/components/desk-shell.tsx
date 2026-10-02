@@ -6,7 +6,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import { logoutAction } from "@/app/actions/auth";
 import { DeskChromeProvider } from "@/components/desk-chrome-context";
-import { IdleNudge } from "@/components/idle-nudge";
+import { IdleNudge, type IdleNudgeSettings } from "@/components/idle-nudge";
 import { QuickLogModal } from "@/components/quick-log-modal";
 
 const MODULES = [
@@ -31,10 +31,12 @@ export function DeskShell({
   children,
   clients,
   openRequests,
+  idleNudge,
 }: {
   children: React.ReactNode;
   clients: ClientOption[];
   openRequests: RequestOption[];
+  idleNudge: IdleNudgeSettings;
 }) {
   const pathname = usePathname();
   const [logOpen, setLogOpen] = useState(false);
@@ -175,7 +177,7 @@ export function DeskShell({
         open={logOpen}
         onOpenChange={setLogOpen}
       />
-      <IdleNudge onLog={() => setLogOpen(true)} />
+      <IdleNudge onLog={() => setLogOpen(true)} settings={idleNudge} />
     </DeskChromeProvider>
   );
 }

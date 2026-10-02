@@ -39,6 +39,11 @@ enum RequestSource {
   ad_hoc
 }
 
+enum RequestCloseKind {
+  hours
+  project_task
+}
+
 enum ProjectStatus {
   intake
   scoping
@@ -167,16 +172,19 @@ model Contract {
 }
 
 model Request {
-  id             String        @id @default(cuid())
+  id             String            @id @default(cuid())
   clientId       String
-  client         Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client         Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   title          String
-  description    String?       @db.Text
-  status         RequestStatus @default(requested)
-  source         RequestSource @default(manual)
-  emailMessageId String?       @unique
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  description    String?           @db.Text
+  status         RequestStatus     @default(requested)
+  source         RequestSource     @default(manual)
+  emailMessageId String?           @unique
+  closeKind      RequestCloseKind?
+  buildTaskId    String?
+  buildTask      BuildTask?        @relation(fields: [buildTaskId], references: [id], onDelete: SetNull)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   interventions Intervention[]
   inboundEmails InboundEmail[]
@@ -184,6 +192,7 @@ model Request {
   attachments   RequestAttachment[]
 
   @@index([clientId, status])
+  @@index([buildTaskId])
 }
 
 model RequestMessage {
@@ -256,22 +265,25 @@ model InboundEmailAttachment {
 }
 
 model Intervention {
-  id            String                     @id @default(cuid())
-  clientId      String
-  client        Client                     @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  requestId     String
-  request       Request                    @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  minutes       Int
-  note          String?                    @db.Text
-  billingStatus InterventionBillingStatus  @default(billable)
-  billedAt      DateTime?
-  reportId      String?
-  report        Report?                    @relation(fields: [reportId], references: [id], onDelete: SetNull)
-  performedAt   DateTime                   @default(now())
-  createdById   String?
-  createdBy     User?                      @relation("InterventionAuthor", fields: [createdById], references: [id])
-  createdAt     DateTime                   @default(now())
-  updatedAt     DateTime                   @updatedAt
+  id              String                     @id @default(cuid())
+  clientId        String
+  client          Client                     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  requestId       String
+  request         Request                    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  /// Tempo trabalhado. Pode ser 0 se houver valor acordado (€).
+  minutes         Int
+  /// Valor fixo acordado com o cliente (substitui horas × taxa na faturação).
+  agreedAmountEur Decimal?                   @db.Decimal(12, 2)
+  note            String?                    @db.Text
+  billingStatus   InterventionBillingStatus  @default(billable)
+  billedAt        DateTime?
+  reportId        String?
+  report          Report?                    @relation(fields: [reportId], references: [id], onDelete: SetNull)
+  performedAt     DateTime                   @default(now())
+  createdById     String?
+  createdBy       User?                      @relation("InterventionAuthor", fields: [createdById], references: [id])
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
 
   @@index([clientId, performedAt])
   @@index([requestId])
@@ -386,6 +398,8 @@ model BuildTask {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
+  requests Request[]
+
   @@index([projectId, status])
 }
 
@@ -467,6 +481,20 @@ model PlatformConfig {
   locale               String   @default("pt-PT")
   /// Month (1–12) when the fiscal year starts. 1 = calendar year.
   fiscalYearStartMonth Int      @default(1)
+
+  /// Alert: interventions / delivered projects ready to invoice.
+  alertBillableEnabled Boolean  @default(true)
+  /// Alert: idle nudge «Algo para registar?»
+  alertRegisterEnabled Boolean  @default(true)
+  /// Alert: pack / avença hours exhausted.
+  alertAttainedEnabled Boolean  @default(true)
+  /// Alert: project past deadline.
+  alertDeadlineEnabled Boolean  @default(true)
+  /// Play sound only for the register (idle) nudge.
+  alertRegisterSoundEnabled Boolean @default(true)
+  /// Idle nudge window in minutes (random between min and max).
+  alertRegisterMinMinutes Int   @default(60)
+  alertRegisterMaxMinutes Int   @default(90)
 
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

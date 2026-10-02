@@ -258,6 +258,10 @@ export function PipelineBoard({
   }
 
   function moveTo(id: string, status: PipelineRequest["status"]) {
+    if (status === "done") {
+      setOpenRequestId(id);
+      return;
+    }
     startTransition(async () => {
       await updateRequestStatus(id, status);
       router.refresh();

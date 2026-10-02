@@ -43,6 +43,8 @@ const MATCH_LABEL: Record<string, string> = {
   from_email: "Email do cliente",
   from_domain: "Domínio do cliente",
   from_domain_or_client_email: "Domínio do cliente",
+  prior_inbound_sender: "Remetente já visto",
+  user_email: "Utilizador do cliente",
   thread_reply: "Resposta ao pedido",
   manual_assign: "Atribuição manual",
 };

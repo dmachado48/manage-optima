@@ -16,7 +16,7 @@ try {
   let aliases = 0;
 
   for (const email of inbound) {
-    if (email.matchedClientId && email.matchReason === "manual_assign") {
+    if (email.matchedClientId) {
       await prisma.clientEmailAlias.upsert({
         where: { email: email.fromAddress.toLowerCase() },
         update: { clientId: email.matchedClientId },

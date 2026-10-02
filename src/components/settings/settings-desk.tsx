@@ -10,7 +10,7 @@ import {
   updateContract,
 } from "@/app/actions/clients";
 import { upsertFinanceYear } from "@/app/actions/finance";
-import { updatePlatformConfig } from "@/app/actions/settings";
+import { updateAlertSettings, updatePlatformConfig } from "@/app/actions/settings";
 import {
   billSelectedInterventions,
   setInterventionBillingStatusForm,
@@ -58,6 +58,7 @@ type ContractRow = {
 type InterventionRow = {
   id: string;
   minutes: number;
+  agreedAmountEur: number | null;
   note: string | null;
   billingStatus: keyof typeof INTERVENTION_BILLING_LABELS;
   performedAt: string;
@@ -1191,6 +1192,7 @@ export function SettingsDesk({
                   <th className="px-3 py-2 font-medium">Cliente</th>
                   <th className="px-3 py-2 font-medium">Pedido</th>
                   <th className="px-3 py-2 font-medium">Tempo</th>
+                  <th className="px-3 py-2 font-medium">Valor</th>
                   <th className="px-3 py-2 font-medium">Faturação</th>
                   <th className="px-3 py-2 font-medium">Lote</th>
                   <th className="px-3 py-2 font-medium text-right">Ações</th>
@@ -1200,7 +1202,7 @@ export function SettingsDesk({
                 {filteredInterventions.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={9}
                       className="px-3 py-8 text-center text-sm text-muted"
                     >
                       Sem intervenções neste filtro.
@@ -1246,6 +1248,11 @@ export function SettingsDesk({
                       </td>
                       <td className="px-3 py-2.5 text-muted tabular-nums">
                         {formatMinutes(i.minutes)}
+                      </td>
+                      <td className="px-3 py-2.5 text-muted tabular-nums">
+                        {i.agreedAmountEur != null && i.agreedAmountEur > 0
+                          ? `${i.agreedAmountEur.toFixed(2)} €`
+                          : "—"}
                       </td>
                       <td className="px-3 py-2.5">
                         <form
@@ -1466,6 +1473,130 @@ export function SettingsDesk({
                 </Button>
                 {platformSaved ? (
                   <span className="text-xs text-muted">Guardado</span>
+                ) : null}
+              </div>
+            </form>
+          </section>
+
+          <section className="rounded-xl border border-border bg-surface p-4">
+            <h2 className="mb-1 text-sm font-medium">Alertas</h2>
+            <p className="mb-4 text-xs text-muted">
+              Tipos ativos na mesa. Só o lembrete «Para registar» pode tocar
+              som.
+            </p>
+            <form
+              className="flex flex-col gap-4"
+              action={(fd) => {
+                startTransition(async () => {
+                  await updateAlertSettings(fd);
+                  setPlatformSaved(true);
+                  setTimeout(() => setPlatformSaved(false), 2500);
+                  router.refresh();
+                });
+              }}
+            >
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="alertBillableEnabled"
+                  defaultChecked={platformConfig.alertBillableEnabled}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Para faturar</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Intervenções por faturar e projetos entregues.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="alertRegisterEnabled"
+                  defaultChecked={platformConfig.alertRegisterEnabled}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Para registar</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Lembrete «Algo para registar?» após inatividade.
+                  </span>
+                </span>
+              </label>
+              <label className="ml-7 flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="alertRegisterSoundEnabled"
+                  defaultChecked={platformConfig.alertRegisterSoundEnabled}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Som no lembrete de registar</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Único alerta sonoro. Os outros tipos ficam silenciosos.
+                  </span>
+                </span>
+              </label>
+              <div className="ml-7 flex flex-wrap gap-3">
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted">Mín. minutos</span>
+                  <input
+                    type="number"
+                    name="alertRegisterMinMinutes"
+                    min={15}
+                    max={240}
+                    step={5}
+                    defaultValue={platformConfig.alertRegisterMinMinutes}
+                    className="w-24 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted">Máx. minutos</span>
+                  <input
+                    type="number"
+                    name="alertRegisterMaxMinutes"
+                    min={15}
+                    max={360}
+                    step={5}
+                    defaultValue={platformConfig.alertRegisterMaxMinutes}
+                    className="w-24 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+                  />
+                </label>
+              </div>
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="alertAttainedEnabled"
+                  defaultChecked={platformConfig.alertAttainedEnabled}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Atingiu</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Pack ou avença no limite de horas.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  name="alertDeadlineEnabled"
+                  defaultChecked={platformConfig.alertDeadlineEnabled}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Deadline</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Projetos com prazo ultrapassado.
+                  </span>
+                </span>
+              </label>
+              <div className="flex items-center gap-3">
+                <Button type="submit" variant="primary" isDisabled={pending}>
+                  Guardar alertas
+                </Button>
+                {platformSaved ? (
+                  <span className="text-xs text-muted">Guardado.</span>
                 ) : null}
               </div>
             </form>

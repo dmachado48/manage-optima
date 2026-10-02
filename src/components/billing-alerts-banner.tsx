@@ -3,6 +3,12 @@
 import Link from "next/link";
 import type { BillingAlert } from "@/lib/billing";
 
+const CATEGORY_LABEL: Record<BillingAlert["category"], string> = {
+  billable: "Para faturar",
+  attained: "Atingiu",
+  deadline: "Deadline",
+};
+
 export function BillingAlertsBanner({
   alerts,
   pending,
@@ -19,7 +25,7 @@ export function BillingAlertsBanner({
   return (
     <section className="rounded-xl border border-amber-300 bg-amber-50 p-4">
       <h2 className="mb-2 text-sm font-medium text-amber-950">
-        Alertas de faturação ({alerts.length})
+        Alertas ({alerts.length})
       </h2>
       <ul className="flex flex-col gap-2">
         {alerts.map((a) => {
@@ -30,6 +36,9 @@ export function BillingAlertsBanner({
               className="flex flex-wrap items-center justify-between gap-2 text-sm text-amber-950"
             >
               <div>
+                <span className="mr-1.5 rounded-sm bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-950">
+                  {CATEGORY_LABEL[a.category]}
+                </span>
                 <span className="font-medium">{a.label}</span>
                 <span className="text-amber-900/80">
                   {" "}

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import {
-  assertValidMinutes,
+  assertCloseableBilling,
   currentPeriodKey,
   hoursFromMinutes,
   shouldDeduct,
@@ -14,7 +14,9 @@ import type { InterventionBillingStatus, Prisma } from "@prisma/client";
 export type QuickLogInput = {
   clientId: string;
   requestId?: string | null;
-  minutes: number;
+  minutes?: number | null;
+  /** Fixed price agreed with the client (EUR). */
+  agreedAmountEur?: number | null;
   note?: string | null;
   createAdHocTitle?: string;
   billingStatus?: InterventionBillingStatus | null;
@@ -64,7 +66,10 @@ function revalidateInterventionPaths(clientId?: string) {
 
 export async function logIntervention(input: QuickLogInput) {
   const session = await requireAdmin();
-  assertValidMinutes(input.minutes);
+  const { minutes, agreedAmountEur } = assertCloseableBilling({
+    minutes: input.minutes,
+    agreedAmountEur: input.agreedAmountEur,
+  });
 
   const client = await prisma.client.findUnique({
     where: { id: input.clientId },
@@ -100,10 +105,11 @@ export async function logIntervention(input: QuickLogInput) {
     let billingStatus: InterventionBillingStatus =
       input.billingStatus ?? "billable";
     if (!input.billingStatus) {
-      if (active && shouldDeduct(active.type)) {
-        billingStatus = "included";
-      } else if (active?.type === "hourly") {
+      // Fixed agreed € is always billable (not deducted from pack/avença).
+      if (agreedAmountEur != null && minutes <= 0) {
         billingStatus = "billable";
+      } else if (active && shouldDeduct(active.type) && minutes > 0) {
+        billingStatus = "included";
       } else {
         billingStatus = "billable";
       }
@@ -113,7 +119,9 @@ export async function logIntervention(input: QuickLogInput) {
       data: {
         clientId: input.clientId,
         requestId: requestId!,
-        minutes: input.minutes,
+        minutes,
+        agreedAmountEur:
+          agreedAmountEur != null ? agreedAmountEur.toFixed(2) : null,
         note: input.note?.trim() || null,
         billingStatus,
         performedAt: new Date(),
@@ -124,12 +132,13 @@ export async function logIntervention(input: QuickLogInput) {
     if (
       billingStatus === "included" &&
       active &&
-      shouldDeduct(active.type)
+      shouldDeduct(active.type) &&
+      minutes > 0
     ) {
       await tx.contract.update({
         where: { id: active.id },
         data: {
-          hoursUsed: Number(active.hoursUsed) + hoursFromMinutes(input.minutes),
+          hoursUsed: Number(active.hoursUsed) + hoursFromMinutes(minutes),
         },
       });
     }
@@ -153,6 +162,11 @@ export async function logInterventionForm(formData: FormData) {
     clientId: String(formData.get("clientId") ?? ""),
     requestId: String(formData.get("requestId") ?? "") || null,
     minutes: Number(formData.get("minutes") ?? 0),
+    agreedAmountEur: (() => {
+      const raw = String(formData.get("agreedAmountEur") ?? "").trim();
+      if (!raw) return null;
+      return Number(raw);
+    })(),
     note: String(formData.get("note") ?? "") || null,
     createAdHocTitle: String(formData.get("adHocTitle") ?? "") || undefined,
     billingStatus,
@@ -234,6 +248,8 @@ export async function billSelectedInterventions(input: {
     interventions: rows.map((i) => ({
       clientName: i.client.name,
       minutes: i.minutes,
+      agreedAmountEur:
+        i.agreedAmountEur != null ? Number(i.agreedAmountEur) : null,
       note: i.note,
       performedAt: i.performedAt,
       requestTitle: i.request.title,
@@ -244,6 +260,10 @@ export async function billSelectedInterventions(input: {
   const periodEnd = rows[rows.length - 1]!.performedAt;
   const rowIds = rows.map((r) => r.id);
   const totalMinutes = rows.reduce((s, r) => s + r.minutes, 0);
+  const totalAgreedEur = rows.reduce(
+    (s, r) => s + (r.agreedAmountEur != null ? Number(r.agreedAmountEur) : 0),
+    0,
+  );
 
   const report = await prisma.$transaction(async (tx) => {
     const created = await tx.report.create({
@@ -281,6 +301,7 @@ export async function billSelectedInterventions(input: {
     clientName: client.name,
     count: rows.length,
     totalMinutes,
+    totalAgreedEur,
   };
 }
 

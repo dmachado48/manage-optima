@@ -312,6 +312,7 @@ export function ClientSheet({
   interventions: {
     id: string;
     minutes: number;
+    agreedAmountEur: number | null;
     note: string | null;
     performedAt: string;
     billingStatus: keyof typeof INTERVENTION_BILLING_LABELS;
@@ -621,6 +622,7 @@ export function ClientSheet({
                   <tr>
                     <th className="px-3 py-2 font-medium">Pedido</th>
                     <th className="px-3 py-2 font-medium">Tempo</th>
+                    <th className="px-3 py-2 font-medium">Valor</th>
                     <th className="px-3 py-2 font-medium">Data</th>
                     <th className="px-3 py-2 font-medium">Faturação</th>
                   </tr>
@@ -646,6 +648,11 @@ export function ClientSheet({
                       </td>
                       <td className="px-3 py-2.5 text-xs tabular-nums text-muted">
                         {formatMinutes(i.minutes)}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs tabular-nums text-muted">
+                        {i.agreedAmountEur != null && i.agreedAmountEur > 0
+                          ? `${i.agreedAmountEur.toFixed(2)} €`
+                          : "—"}
                       </td>
                       <td className="px-3 py-2.5 text-xs text-muted">
                         {formatDatePt(new Date(i.performedAt))}

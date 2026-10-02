@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   addManualPlanItem,
-  completeLinkedRequest,
   saveDayResume,
   togglePlanItem,
 } from "@/app/actions/daily";
@@ -71,10 +70,9 @@ export function DailyDesk({
       if (job.planItemId) {
         await togglePlanItem(job.planItemId, !job.done);
       } else if (job.requestId && !job.done) {
-        const ok = window.confirm(
-          "Marcar o pedido associado como concluído (done)?",
+        window.alert(
+          "Para concluir o pedido, abre-o no pipeline e regista tempo ou valor acordado (€).",
         );
-        if (ok) await completeLinkedRequest(job.requestId);
       }
       refresh();
     });

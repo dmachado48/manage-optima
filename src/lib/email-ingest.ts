@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { storeBuffer } from "@/lib/uploads";
 import {
   matchClientForInbound,
+  rememberSenderAlias,
   titleFromSubject,
 } from "@/lib/email-match";
 
@@ -225,6 +226,8 @@ export async function ingestInboundEmail(
       requestId: created.request.id,
       requestMessageId: created.requestMessage.id,
     });
+
+    await rememberSenderAlias(match.clientId, input.fromAddress);
 
     return {
       inboundId: created.inbound.id,

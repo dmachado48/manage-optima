@@ -6,7 +6,7 @@ import {
   ingestInboundEmail,
   requestDescription,
 } from "@/lib/email-ingest";
-import { titleFromSubject } from "@/lib/email-match";
+import { rememberSenderAlias, titleFromSubject } from "@/lib/email-match";
 import { prisma } from "@/lib/prisma";
 
 export async function assignInboundToClient(
@@ -70,15 +70,6 @@ export async function assignInboundToClient(
       });
     }
 
-    await tx.clientEmailAlias.upsert({
-      where: { email: inbound.fromAddress.trim().toLowerCase() },
-      update: { clientId },
-      create: {
-        clientId,
-        email: inbound.fromAddress.trim().toLowerCase(),
-      },
-    });
-
     await tx.inboundEmail.update({
       where: { id: inboundId },
       data: {
@@ -91,6 +82,8 @@ export async function assignInboundToClient(
 
     return createdRequest;
   });
+
+  await rememberSenderAlias(clientId, inbound.fromAddress);
 
   revalidatePath("/inbox");
   revalidatePath("/pipeline");

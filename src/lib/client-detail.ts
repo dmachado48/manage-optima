@@ -109,6 +109,7 @@ export async function getClientDetail(clientId: string) {
         select: {
           id: true,
           minutes: true,
+          agreedAmountEur: true,
           note: true,
           performedAt: true,
           billingStatus: true,
@@ -147,8 +148,16 @@ export async function getClientDetail(clientId: string) {
     if (hoursByMonth.has(key)) {
       hoursByMonth.set(key, (hoursByMonth.get(key) ?? 0) + i.minutes / 60);
     }
-    if (hourlyRate && (i.billingStatus === "billed" || i.billingStatus === "billable")) {
-      const value = (i.minutes / 60) * hourlyRate;
+    if (i.billingStatus === "billed" || i.billingStatus === "billable") {
+      const agreed =
+        i.agreedAmountEur != null ? Number(i.agreedAmountEur) : null;
+      const value =
+        agreed != null && agreed > 0
+          ? agreed
+          : hourlyRate
+            ? (i.minutes / 60) * hourlyRate
+            : 0;
+      if (value <= 0) continue;
       if (i.billingStatus === "billed") {
         maintenanceRevenue += value;
       }
@@ -276,6 +285,8 @@ export async function getClientDetail(clientId: string) {
     interventions: client.interventions.map((i) => ({
       id: i.id,
       minutes: i.minutes,
+      agreedAmountEur:
+        i.agreedAmountEur != null ? Number(i.agreedAmountEur) : null,
       note: i.note,
       performedAt: i.performedAt.toISOString(),
       billingStatus: i.billingStatus,

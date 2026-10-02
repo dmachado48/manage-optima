@@ -10,7 +10,9 @@
     "db:migrate": "prisma migrate dev",
     "db:seed": "npx tsx prisma/seed.ts",
     "db:import-horas": "npx tsx prisma/import-registo-horas.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "deploy": "bash scripts/deploy-webiton.sh full",
+    "deploy:remote": "bash scripts/deploy-webiton.sh remote"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

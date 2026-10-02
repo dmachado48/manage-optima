@@ -258,6 +258,10 @@ export function ClientWorkBoard({
 
   function moveTo(id: string, status: KanbanRequest["status"]) {
     if (!interactive) return;
+    if (status === "done") {
+      setOpenRequestId(id);
+      return;
+    }
     startTransition(async () => {
       await updateRequestStatus(id, status);
       router.refresh();

@@ -182,6 +182,7 @@ export async function getFinanceActuals(year: number): Promise<FinanceActuals> {
       },
       select: {
         minutes: true,
+        agreedAmountEur: true,
         performedAt: true,
         billedAt: true,
         clientId: true,
@@ -337,11 +338,18 @@ export async function getFinanceActuals(year: number): Promise<FinanceActuals> {
   }
 
   for (const i of interventions) {
-    const rate = rateByClient.get(i.clientId);
-    if (!rate) continue;
     const when = i.billedAt ?? i.performedAt;
     const q = Math.floor(when.getUTCMonth() / 3);
-    const amount = (i.minutes / 60) * rate;
+    const agreed =
+      i.agreedAmountEur != null ? Number(i.agreedAmountEur) : null;
+    const rate = rateByClient.get(i.clientId);
+    const amount =
+      agreed != null && agreed > 0
+        ? agreed
+        : rate
+          ? (i.minutes / 60) * rate
+          : 0;
+    if (amount <= 0) continue;
     byQuarterMaintenance[q] += amount;
     bump(i.clientId, q, "maintenance", amount);
   }

@@ -127,6 +127,8 @@ export default async function SettingsPage({
         return {
           id: i.id,
           minutes: i.minutes,
+          agreedAmountEur:
+            i.agreedAmountEur != null ? Number(i.agreedAmountEur) : null,
           note: i.note,
           billingStatus: i.billingStatus,
           performedAt: i.performedAt.toISOString(),

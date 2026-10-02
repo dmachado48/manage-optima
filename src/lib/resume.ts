@@ -3,6 +3,7 @@ import { formatDatePt, formatMinutes } from "./dates";
 export type ResumeIntervention = {
   clientName: string;
   minutes: number;
+  agreedAmountEur?: number | null;
   note: string | null;
   performedAt: Date;
   requestTitle: string;
@@ -99,17 +100,25 @@ export function draftSelectionReportPt(input: {
       : "—";
 
   const list = sorted
-    .map(
-      (i) =>
-        `- ${formatDatePt(i.performedAt)} · ${formatMinutes(i.minutes)} · ${i.requestTitle}${i.note ? ` — ${i.note}` : ""}`,
-    )
+    .map((i) => {
+      const amount =
+        i.agreedAmountEur != null && i.agreedAmountEur > 0
+          ? ` · ${i.agreedAmountEur.toFixed(2)} €`
+          : "";
+      return `- ${formatDatePt(i.performedAt)} · ${formatMinutes(i.minutes)}${amount} · ${i.requestTitle}${i.note ? ` — ${i.note}` : ""}`;
+    })
     .join("\n");
+
+  const totalAgreed = sorted.reduce(
+    (s, i) => s + (i.agreedAmountEur != null && i.agreedAmountEur > 0 ? i.agreedAmountEur : 0),
+    0,
+  );
 
   return [
     `Relatório de intervenções — ${input.clientName}`,
     `Ref. lote: ${input.batchCode}`,
     `Período: ${period}`,
-    `Total: ${formatMinutes(total)} (${sorted.length} registo${sorted.length === 1 ? "" : "s"}).`,
+    `Total: ${formatMinutes(total)} (${sorted.length} registo${sorted.length === 1 ? "" : "s"})${totalAgreed > 0 ? ` · ${totalAgreed.toFixed(2)} € acordados` : ""}.`,
     input.markBilled ? "Estado: marcado como faturado neste relatório." : "",
     "",
     "Intervenções:",

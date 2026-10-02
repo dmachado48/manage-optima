@@ -68,12 +68,9 @@ export async function togglePlanItem(planItemId: string, done: boolean) {
 
 export async function completeLinkedRequest(requestId: string) {
   await requireAdmin();
-  await prisma.request.update({
-    where: { id: requestId },
-    data: { status: "done" },
-  });
-  revalidatePath("/");
-  revalidatePath("/maintenance");
+  throw new Error(
+    "Para concluir, abre o pedido e regista tempo ou valor acordado (€).",
+  );
 }
 
 export async function getDayResumeData(date = new Date()) {

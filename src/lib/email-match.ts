@@ -17,16 +17,23 @@ function domainOf(email: string): string | null {
 
 const PUBLIC_EMAIL_DOMAINS = new Set([
   "gmail.com",
+  "googlemail.com",
   "hotmail.com",
   "hotmail.pt",
   "outlook.com",
   "outlook.pt",
   "live.com",
+  "msn.com",
   "icloud.com",
   "me.com",
+  "mac.com",
   "yahoo.com",
   "yahoo.fr",
+  "yahoo.pt",
   "sapo.pt",
+  "mail.pt",
+  "proton.me",
+  "protonmail.com",
 ]);
 
 /**
@@ -48,11 +55,30 @@ export function extractRoutingToken(
 }
 
 /**
+ * Persist sender → client so the next inbound email matches automatically.
+ */
+export async function rememberSenderAlias(
+  clientId: string,
+  fromAddress: string,
+) {
+  const email = normalizeEmail(fromAddress);
+  if (!email || !email.includes("@")) return;
+
+  await prisma.clientEmailAlias.upsert({
+    where: { email },
+    update: { clientId },
+    create: { clientId, email },
+  });
+}
+
+/**
  * Match order:
- * 1. To token → Client.kanbanShareToken (área do cliente)
- * 2. From email → learned sender alias
- * 3. From email → Client.email
- * 4. From domain → Client.domain or Client.email domain
+ * 1. To token → Client.kanbanShareToken
+ * 2. Learned sender alias
+ * 3. Exact Client.email
+ * 4. Prior inbound from same sender already matched/assigned
+ * 5. From domain → Client.domain or Client.email domain (non-public)
+ * 6. Linked User.email for that client
  */
 export async function matchClientForInbound(input: {
   fromAddress: string;
@@ -80,24 +106,65 @@ export async function matchClientForInbound(input: {
   }
 
   const byEmail = await prisma.client.findFirst({
-    where: { email: from },
+    where: { email: from, active: true },
     select: { id: true },
   });
   if (byEmail) {
     return { clientId: byEmail.id, reason: "from_email" };
   }
 
+  const priorInbound = await prisma.inboundEmail.findFirst({
+    where: {
+      fromAddress: from,
+      matchedClientId: { not: null },
+      status: { in: ["matched", "assigned"] },
+    },
+    orderBy: { receivedAt: "desc" },
+    select: { matchedClientId: true },
+  });
+  if (priorInbound?.matchedClientId) {
+    return {
+      clientId: priorInbound.matchedClientId,
+      reason: "prior_inbound_sender",
+    };
+  }
+
+  const byUser = await prisma.user.findFirst({
+    where: {
+      email: from,
+      clientId: { not: null },
+      client: { active: true },
+    },
+    select: { clientId: true },
+  });
+  if (byUser?.clientId) {
+    return { clientId: byUser.clientId, reason: "user_email" };
+  }
+
   const domain = domainOf(from);
   if (domain && !PUBLIC_EMAIL_DOMAINS.has(domain)) {
-    const byDomain = await prisma.client.findFirst({
+    const byExactDomain = await prisma.client.findFirst({
+      where: { active: true, domain },
+      select: { id: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (byExactDomain) {
+      return { clientId: byExactDomain.id, reason: "from_domain" };
+    }
+
+    const byEmailDomain = await prisma.client.findFirst({
       where: {
-        OR: [{ domain }, { email: { endsWith: `@${domain}` } }],
+        active: true,
+        email: { endsWith: `@${domain}` },
       },
       select: { id: true },
-      orderBy: { domain: "desc" },
+      orderBy: { updatedAt: "desc" },
     });
-    if (byDomain) {
-      return { clientId: byDomain.id, reason: "from_domain_or_client_email" };
+    if (byEmailDomain) {
+      return {
+        clientId: byEmailDomain.id,
+        reason: "from_domain_or_client_email",
+      };
     }
   }
 

@@ -10,6 +10,7 @@ import {
   type RequestThread,
 } from "@/app/actions/messages";
 import { updateRequestStatus } from "@/app/actions/requests";
+import { RequestClosePanel } from "@/components/pipeline/request-close-panel";
 
 const STATUS_LABEL: Record<RequestThread["status"], string> = {
   requested: "Pedidos",
@@ -187,7 +188,11 @@ export function RequestDetailModal({
               {mode === "admin" ? (
                 <div className="flex flex-wrap gap-1">
                   {(
-                    Object.keys(STATUS_LABEL) as RequestThread["status"][]
+                    [
+                      "requested",
+                      "in_progress",
+                      "waiting_on_client",
+                    ] as RequestThread["status"][]
                   ).map((s) => (
                     <button
                       key={s}
@@ -209,6 +214,20 @@ export function RequestDetailModal({
                   {STATUS_LABEL[thread.status]}
                 </Chip>
               )}
+
+              {mode === "admin" ? (
+                <RequestClosePanel
+                  requestId={requestId}
+                  requestTitle={thread.title}
+                  alreadyDone={thread.status === "done"}
+                  closeKind={thread.closeKind}
+                  buildTask={thread.buildTask}
+                  onClosed={() => {
+                    refresh();
+                    onChanged?.();
+                  }}
+                />
+              ) : null}
 
               {thread.looseAttachments.length > 0 ? (
                 <div>

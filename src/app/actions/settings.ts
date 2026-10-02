@@ -153,3 +153,84 @@ export async function updatePlatformConfig(formData: FormData) {
   revalidatePath("/projects");
   revalidatePath("/");
 }
+
+export async function updateAlertSettings(formData: FormData) {
+  await requireAdmin();
+
+  const alertBillableEnabled = formData.get("alertBillableEnabled") === "on";
+  const alertRegisterEnabled = formData.get("alertRegisterEnabled") === "on";
+  const alertAttainedEnabled = formData.get("alertAttainedEnabled") === "on";
+  const alertDeadlineEnabled = formData.get("alertDeadlineEnabled") === "on";
+  const alertRegisterSoundEnabled =
+    formData.get("alertRegisterSoundEnabled") === "on";
+  let alertRegisterMinMinutes = optionalInt(
+    String(formData.get("alertRegisterMinMinutes") ?? "60"),
+    60,
+  );
+  let alertRegisterMaxMinutes = optionalInt(
+    String(formData.get("alertRegisterMaxMinutes") ?? "90"),
+    90,
+  );
+
+  alertRegisterMinMinutes = Math.min(240, Math.max(15, alertRegisterMinMinutes));
+  alertRegisterMaxMinutes = Math.min(
+    360,
+    Math.max(alertRegisterMinMinutes, alertRegisterMaxMinutes),
+  );
+
+  const data = {
+    alertBillableEnabled,
+    alertRegisterEnabled,
+    alertAttainedEnabled,
+    alertDeadlineEnabled,
+    alertRegisterSoundEnabled,
+    alertRegisterMinMinutes,
+    alertRegisterMaxMinutes,
+  };
+
+  const delegate = (
+    prisma as {
+      platformConfig?: {
+        upsert: (args: unknown) => Promise<unknown>;
+      };
+    }
+  ).platformConfig;
+
+  if (delegate?.upsert) {
+    await delegate.upsert({
+      where: { id: "default" },
+      create: { id: "default", ...data },
+      update: data,
+    });
+  } else {
+    await prisma.$executeRaw`
+      INSERT INTO \`PlatformConfig\` (
+        \`id\`,
+        \`alertBillableEnabled\`, \`alertRegisterEnabled\`,
+        \`alertAttainedEnabled\`, \`alertDeadlineEnabled\`,
+        \`alertRegisterSoundEnabled\`,
+        \`alertRegisterMinMinutes\`, \`alertRegisterMaxMinutes\`,
+        \`createdAt\`, \`updatedAt\`
+      ) VALUES (
+        'default',
+        ${alertBillableEnabled}, ${alertRegisterEnabled},
+        ${alertAttainedEnabled}, ${alertDeadlineEnabled},
+        ${alertRegisterSoundEnabled},
+        ${alertRegisterMinMinutes}, ${alertRegisterMaxMinutes},
+        NOW(3), NOW(3)
+      )
+      ON DUPLICATE KEY UPDATE
+        \`alertBillableEnabled\` = VALUES(\`alertBillableEnabled\`),
+        \`alertRegisterEnabled\` = VALUES(\`alertRegisterEnabled\`),
+        \`alertAttainedEnabled\` = VALUES(\`alertAttainedEnabled\`),
+        \`alertDeadlineEnabled\` = VALUES(\`alertDeadlineEnabled\`),
+        \`alertRegisterSoundEnabled\` = VALUES(\`alertRegisterSoundEnabled\`),
+        \`alertRegisterMinMinutes\` = VALUES(\`alertRegisterMinMinutes\`),
+        \`alertRegisterMaxMinutes\` = VALUES(\`alertRegisterMaxMinutes\`),
+        \`updatedAt\` = NOW(3)
+    `;
+  }
+
+  revalidatePath("/settings");
+  revalidatePath("/");
+}

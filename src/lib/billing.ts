@@ -6,8 +6,57 @@ export function assertValidMinutes(minutes: number): void {
   }
 }
 
+/**
+ * Closing a pipeline request (or logging billable work) requires
+ * either tracked time (30‑min steps) or an agreed client amount (€).
+ */
+export function assertCloseableBilling(input: {
+  minutes?: number | null;
+  agreedAmountEur?: number | null;
+}): { minutes: number; agreedAmountEur: number | null } {
+  const rawMinutes = Number(input.minutes ?? 0);
+  const minutes = Number.isFinite(rawMinutes) ? Math.round(rawMinutes) : 0;
+
+  const rawAmount = input.agreedAmountEur;
+  let agreedAmountEur: number | null = null;
+  if (rawAmount != null && String(rawAmount).trim() !== "") {
+    const n = Number(rawAmount);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new Error("O valor acordado deve ser um montante positivo em euros.");
+    }
+    agreedAmountEur = Math.round(n * 100) / 100;
+  }
+
+  if (minutes > 0) {
+    assertValidMinutes(minutes);
+  }
+
+  if (minutes <= 0 && agreedAmountEur == null) {
+    throw new Error(
+      "Indica tempo (múltiplos de 30 min) ou um valor acordado (€) para registar no histórico e faturar.",
+    );
+  }
+
+  return { minutes: Math.max(0, minutes), agreedAmountEur };
+}
+
 export function hoursFromMinutes(minutes: number): number {
   return minutes / 60;
+}
+
+/** Prefer fixed agreed €; otherwise hours × hourly rate. */
+export function interventionBillableAmount(
+  minutes: number,
+  agreedAmountEur: number | null | undefined,
+  hourlyRate: number | null | undefined,
+): number | null {
+  if (agreedAmountEur != null && Number(agreedAmountEur) > 0) {
+    return Math.round(Number(agreedAmountEur) * 100) / 100;
+  }
+  if (hourlyRate != null && minutes > 0) {
+    return Math.round((minutes / 60) * hourlyRate * 100) / 100;
+  }
+  return null;
 }
 
 export function remainingHours(hoursTotal: number, hoursUsed: number): number {
@@ -69,7 +118,10 @@ export const INTERVENTION_BILLING_LABELS: Record<
 
 export type BillingAlert = {
   id: string;
-  kind: "pack" | "project" | "interventions";
+  /** Internal entity for actions (mark billed, etc.). */
+  kind: "pack" | "project" | "interventions" | "deadline";
+  /** User-facing alert family (settings toggles). */
+  category: "billable" | "attained" | "deadline";
   clientId: string;
   clientName: string;
   label: string;

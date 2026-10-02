@@ -19,6 +19,13 @@ export type PlatformConfigData = {
   currency: string;
   locale: string;
   fiscalYearStartMonth: number;
+  alertBillableEnabled: boolean;
+  alertRegisterEnabled: boolean;
+  alertAttainedEnabled: boolean;
+  alertDeadlineEnabled: boolean;
+  alertRegisterSoundEnabled: boolean;
+  alertRegisterMinMinutes: number;
+  alertRegisterMaxMinutes: number;
 };
 
 export const DEFAULT_PLATFORM_CONFIG: PlatformConfigData = {
@@ -41,6 +48,13 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfigData = {
   currency: "EUR",
   locale: "pt-PT",
   fiscalYearStartMonth: 1,
+  alertBillableEnabled: true,
+  alertRegisterEnabled: true,
+  alertAttainedEnabled: true,
+  alertDeadlineEnabled: true,
+  alertRegisterSoundEnabled: true,
+  alertRegisterMinMinutes: 60,
+  alertRegisterMaxMinutes: 90,
 };
 
 type PlatformConfigRow = {
@@ -62,6 +76,13 @@ type PlatformConfigRow = {
   currency?: string | null;
   locale?: string | null;
   fiscalYearStartMonth?: number | null;
+  alertBillableEnabled?: boolean | number | null;
+  alertRegisterEnabled?: boolean | number | null;
+  alertAttainedEnabled?: boolean | number | null;
+  alertDeadlineEnabled?: boolean | number | null;
+  alertRegisterSoundEnabled?: boolean | number | null;
+  alertRegisterMinMinutes?: number | null;
+  alertRegisterMaxMinutes?: number | null;
 };
 
 function toBool(v: boolean | number | undefined): boolean {
@@ -117,6 +138,34 @@ function mapRow(row: PlatformConfigRow): PlatformConfigData {
         ),
       ),
     ),
+    alertBillableEnabled:
+      row.alertBillableEnabled == null
+        ? DEFAULT_PLATFORM_CONFIG.alertBillableEnabled
+        : toBool(row.alertBillableEnabled),
+    alertRegisterEnabled:
+      row.alertRegisterEnabled == null
+        ? DEFAULT_PLATFORM_CONFIG.alertRegisterEnabled
+        : toBool(row.alertRegisterEnabled),
+    alertAttainedEnabled:
+      row.alertAttainedEnabled == null
+        ? DEFAULT_PLATFORM_CONFIG.alertAttainedEnabled
+        : toBool(row.alertAttainedEnabled),
+    alertDeadlineEnabled:
+      row.alertDeadlineEnabled == null
+        ? DEFAULT_PLATFORM_CONFIG.alertDeadlineEnabled
+        : toBool(row.alertDeadlineEnabled),
+    alertRegisterSoundEnabled:
+      row.alertRegisterSoundEnabled == null
+        ? DEFAULT_PLATFORM_CONFIG.alertRegisterSoundEnabled
+        : toBool(row.alertRegisterSoundEnabled),
+    alertRegisterMinMinutes:
+      row.alertRegisterMinMinutes != null
+        ? Number(row.alertRegisterMinMinutes)
+        : DEFAULT_PLATFORM_CONFIG.alertRegisterMinMinutes,
+    alertRegisterMaxMinutes:
+      row.alertRegisterMaxMinutes != null
+        ? Number(row.alertRegisterMaxMinutes)
+        : DEFAULT_PLATFORM_CONFIG.alertRegisterMaxMinutes,
   };
 }
 

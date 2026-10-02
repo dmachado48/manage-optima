@@ -33,6 +33,13 @@ export type RequestThread = {
   description: string | null;
   status: "requested" | "in_progress" | "waiting_on_client" | "done";
   source: string;
+  closeKind: "hours" | "project_task" | null;
+  buildTask: {
+    id: string;
+    title: string;
+    projectId: string;
+    projectTitle: string;
+  } | null;
   createdAt: string;
   updatedAt: string;
   client: { id: string; name: string; email: string | null };
@@ -62,6 +69,14 @@ async function loadThread(requestId: string): Promise<RequestThread> {
     where: { id: requestId },
     include: {
       client: { select: { id: true, name: true, email: true } },
+      buildTask: {
+        select: {
+          id: true,
+          title: true,
+          projectId: true,
+          project: { select: { title: true } },
+        },
+      },
       inboundEmails: {
         orderBy: { receivedAt: "desc" },
         take: 1,
@@ -102,6 +117,15 @@ async function loadThread(requestId: string): Promise<RequestThread> {
     description: request.description,
     status: request.status,
     source: request.source,
+    closeKind: request.closeKind,
+    buildTask: request.buildTask
+      ? {
+          id: request.buildTask.id,
+          title: request.buildTask.title,
+          projectId: request.buildTask.projectId,
+          projectTitle: request.buildTask.project.title,
+        }
+      : null,
     createdAt: request.createdAt.toISOString(),
     updatedAt: request.updatedAt.toISOString(),
     client: request.client,
