@@ -219,7 +219,8 @@ export function RequestDetailModal({
                 <RequestClosePanel
                   requestId={requestId}
                   requestTitle={thread.title}
-                  alreadyDone={thread.status === "done"}
+                  status={thread.status}
+                  closedAt={thread.closedAt}
                   closeKind={thread.closeKind}
                   buildTask={thread.buildTask}
                   onClosed={() => {

@@ -34,6 +34,7 @@ export type RequestThread = {
   status: "requested" | "in_progress" | "waiting_on_client" | "done";
   source: string;
   closeKind: "hours" | "project_task" | null;
+  closedAt: string | null;
   buildTask: {
     id: string;
     title: string;
@@ -118,6 +119,7 @@ async function loadThread(requestId: string): Promise<RequestThread> {
     status: request.status,
     source: request.source,
     closeKind: request.closeKind,
+    closedAt: request.closedAt?.toISOString() ?? null,
     buildTask: request.buildTask
       ? {
           id: request.buildTask.id,

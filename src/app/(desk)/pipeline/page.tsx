@@ -42,6 +42,7 @@ export default async function PipelinePage() {
             status: r.status,
             source: r.source,
             updatedAt: r.updatedAt.toISOString(),
+            closedAt: r.closedAt?.toISOString() ?? null,
             client: r.client,
             messageCount: r._count.messages,
           }))}

@@ -20,6 +20,8 @@ export type QuickLogInput = {
   note?: string | null;
   createAdHocTitle?: string;
   billingStatus?: InterventionBillingStatus | null;
+  /** When the work was done (defaults to now). */
+  performedAt?: Date | string | null;
 };
 
 type Tx = Prisma.TransactionClient;
@@ -115,6 +117,13 @@ export async function logIntervention(input: QuickLogInput) {
       }
     }
 
+    const performedAt = input.performedAt
+      ? new Date(input.performedAt)
+      : new Date();
+    if (Number.isNaN(performedAt.getTime())) {
+      throw new Error("Data de conclusão inválida");
+    }
+
     const created = await tx.intervention.create({
       data: {
         clientId: input.clientId,
@@ -124,7 +133,7 @@ export async function logIntervention(input: QuickLogInput) {
           agreedAmountEur != null ? agreedAmountEur.toFixed(2) : null,
         note: input.note?.trim() || null,
         billingStatus,
-        performedAt: new Date(),
+        performedAt,
         createdById: session.user.id,
       },
     });

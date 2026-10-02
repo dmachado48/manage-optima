@@ -10,6 +10,7 @@ export type ClientRequestRow = {
   source: string;
   createdAt: string;
   updatedAt: string;
+  closedAt: string | null;
   minutesTotal: number;
 };
 
@@ -216,6 +217,7 @@ export async function getClientDetail(clientId: string) {
     source: r.source,
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
+    closedAt: r.closedAt?.toISOString() ?? null,
     minutesTotal: r.interventions.reduce((sum, i) => sum + i.minutes, 0),
   }));
 

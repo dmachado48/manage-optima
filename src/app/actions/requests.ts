@@ -55,16 +55,39 @@ export async function updateRequestStatus(
   await requireAdmin();
 
   if (status === "done") {
-    throw new Error(
-      "Para concluir, usa «Registar no histórico» e indica tempo ou valor acordado (€).",
-    );
+    // Soft conclude — stays in «Concluído» until finalized with time/€.
+    const updated = await prisma.request.update({
+      where: { id: requestId },
+      data: {
+        status: "done",
+        closedAt: null,
+      },
+    });
+    revalidateRequest(updated.clientId);
+    return;
   }
 
   const updated = await prisma.request.update({
     where: { id: requestId },
-    data: { status },
+    data: {
+      status,
+      // Reopening clears finalize stamp
+      closedAt: null,
+      closeKind: null,
+    },
   });
   revalidateRequest(updated.clientId);
+}
+
+function parseCompletionDate(raw?: string | null): Date {
+  if (!raw || !String(raw).trim()) return new Date();
+  const s = String(raw).trim();
+  // date input YYYY-MM-DD → noon Lisbon-ish UTC to avoid day shift
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(s)
+    ? new Date(`${s}T12:00:00.000Z`)
+    : new Date(s);
+  if (Number.isNaN(d.getTime())) throw new Error("Data de conclusão inválida");
+  return d;
 }
 
 export async function moveRequest(requestId: string, formData: FormData) {
@@ -158,7 +181,8 @@ export async function getRequestCloseOptions(
 }
 
 /**
- * Close a support request and register time and/or agreed € in client history.
+ * Finalize a request: register time/€ with completion date, then leave
+ * the pipeline «Concluído» column (`closedAt` set).
  */
 export async function closeRequestAsHours(input: {
   requestId: string;
@@ -166,18 +190,22 @@ export async function closeRequestAsHours(input: {
   agreedAmountEur?: number | null;
   note?: string | null;
   billingStatus?: InterventionBillingStatus | null;
+  /** Completion date (YYYY-MM-DD or ISO). Defaults to today. */
+  completedAt?: string | null;
 }) {
   await requireAdmin();
   const billing = assertCloseableBilling({
     minutes: input.minutes,
     agreedAmountEur: input.agreedAmountEur,
   });
+  const closedAt = parseCompletionDate(input.completedAt);
 
   const request = await prisma.request.findUnique({
     where: { id: input.requestId },
-    select: { id: true, clientId: true, title: true, status: true },
+    select: { id: true, clientId: true, title: true, status: true, closedAt: true },
   });
   if (!request) throw new Error("Pedido não encontrado");
+  if (request.closedAt) throw new Error("Pedido já foi fechado e registado");
 
   const note =
     input.note?.trim() ||
@@ -190,6 +218,7 @@ export async function closeRequestAsHours(input: {
     agreedAmountEur: billing.agreedAmountEur,
     note,
     billingStatus: input.billingStatus ?? null,
+    performedAt: closedAt,
   });
 
   await prisma.request.update({
@@ -198,11 +227,12 @@ export async function closeRequestAsHours(input: {
       status: "done",
       closeKind: "hours",
       buildTaskId: null,
+      closedAt,
     },
   });
 
   revalidateRequest(request.clientId);
-  return { ok: true as const, kind: "hours" as const };
+  return { ok: true as const, kind: "hours" as const, closedAt: closedAt.toISOString() };
 }
 
 /**
@@ -219,12 +249,14 @@ export async function closeRequestAsProjectTask(input: {
   markTaskDone?: boolean;
   note?: string | null;
   billingStatus?: InterventionBillingStatus | null;
+  completedAt?: string | null;
 }) {
   await requireAdmin();
   const billing = assertCloseableBilling({
     minutes: input.minutes,
     agreedAmountEur: input.agreedAmountEur,
   });
+  const closedAt = parseCompletionDate(input.completedAt);
 
   const request = await prisma.request.findUnique({
     where: { id: input.requestId },
@@ -233,9 +265,11 @@ export async function closeRequestAsProjectTask(input: {
       clientId: true,
       title: true,
       description: true,
+      closedAt: true,
     },
   });
   if (!request) throw new Error("Pedido não encontrado");
+  if (request.closedAt) throw new Error("Pedido já foi fechado e registado");
 
   const project = await prisma.project.findFirst({
     where: { id: input.projectId, clientId: request.clientId },
@@ -291,6 +325,7 @@ export async function closeRequestAsProjectTask(input: {
         status: "done",
         closeKind: "project_task",
         buildTaskId: taskId,
+        closedAt,
       },
     });
 
@@ -311,12 +346,14 @@ export async function closeRequestAsProjectTask(input: {
     agreedAmountEur: billing.agreedAmountEur,
     note,
     billingStatus: input.billingStatus ?? null,
+    performedAt: closedAt,
   });
 
   revalidateRequest(request.clientId, result.projectId);
   return {
     ok: true as const,
     kind: "project_task" as const,
+    closedAt: closedAt.toISOString(),
     ...result,
   };
 }

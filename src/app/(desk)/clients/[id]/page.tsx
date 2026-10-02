@@ -32,6 +32,7 @@ export default async function ClientDetailPage({
       months={detail.months}
       revenue={detail.revenue}
       totalMinutes={detail.totalMinutes}
+      hourlyRate={detail.hourlyRate}
       interventions={detail.interventions}
     />
   );

@@ -183,6 +183,8 @@ model Request {
   closeKind      RequestCloseKind?
   buildTaskId    String?
   buildTask      BuildTask?        @relation(fields: [buildTaskId], references: [id], onDelete: SetNull)
+  /// Set when finalized with time/€ — leaves the pipeline «Concluído» column.
+  closedAt       DateTime?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -193,6 +195,7 @@ model Request {
 
   @@index([clientId, status])
   @@index([buildTaskId])
+  @@index([status, closedAt])
 }
 
 model RequestMessage {

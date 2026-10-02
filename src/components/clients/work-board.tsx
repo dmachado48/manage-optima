@@ -26,6 +26,7 @@ export type KanbanRequest = {
   status: "requested" | "in_progress" | "waiting_on_client" | "done";
   source: string;
   updatedAt: string;
+  closedAt: string | null;
   client: { id: string; name: string };
   messageCount?: number;
 };
@@ -43,7 +44,6 @@ const COLUMNS: {
 ];
 
 const FLOW = COLUMNS.map((c) => c.key);
-const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 
 function RequestCard({
   request,
@@ -219,7 +219,7 @@ export function ClientWorkBoard({
   portalToken?: string;
 }) {
   const router = useRouter();
-  const [showOldDone, setShowOldDone] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openRequestId, setOpenRequestId] = useState<string | null>(null);
@@ -231,15 +231,12 @@ export function ClientWorkBoard({
   );
 
   const filtered = useMemo(() => {
-    const now = Date.now();
     return requests.filter((r) => {
       if (r.client.id !== lockedClientId) return false;
-      if (r.status === "done" && !showOldDone) {
-        return now - new Date(r.updatedAt).getTime() <= FOURTEEN_DAYS_MS;
-      }
+      if (r.status === "done" && r.closedAt && !showClosed) return false;
       return true;
     });
-  }, [requests, lockedClientId, showOldDone]);
+  }, [requests, lockedClientId, showClosed]);
 
   const byStatus = useMemo(() => {
     const map: Record<KanbanRequest["status"], KanbanRequest[]> = {
@@ -258,13 +255,10 @@ export function ClientWorkBoard({
 
   function moveTo(id: string, status: KanbanRequest["status"]) {
     if (!interactive) return;
-    if (status === "done") {
-      setOpenRequestId(id);
-      return;
-    }
     startTransition(async () => {
       await updateRequestStatus(id, status);
       router.refresh();
+      if (status === "done") setOpenRequestId(id);
     });
   }
 
@@ -322,10 +316,10 @@ export function ClientWorkBoard({
           <label className="flex items-center gap-2 text-xs text-muted">
             <input
               type="checkbox"
-              checked={showOldDone}
-              onChange={(e) => setShowOldDone(e.target.checked)}
+              checked={showClosed}
+              onChange={(e) => setShowClosed(e.target.checked)}
             />
-            Mostrar concluídos antigos
+            Mostrar já fechados
           </label>
           {interactive ? (
             <button

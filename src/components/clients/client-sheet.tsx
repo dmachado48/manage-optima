@@ -15,6 +15,7 @@ import {
   CONTRACT_TYPE_LABELS,
   DEFAULT_AVENCA_JOB_MD,
   INTERVENTION_BILLING_LABELS,
+  interventionBillableAmount,
   remainingHours,
 } from "@/lib/billing";
 import { formatDatePt, formatMinutes } from "@/lib/dates";
@@ -35,6 +36,29 @@ function inRange(iso: string, from: string, to: string): boolean {
   if (from && day < from) return false;
   if (to && day > to) return false;
   return true;
+}
+
+function monthKeyFromIso(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabelFromKey(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return new Intl.DateTimeFormat("pt-PT", {
+    month: "short",
+    year: "2-digit",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(y, m - 1, 1)));
+}
+
+function currentMonthRange(): { from: string; to: string } {
+  const now = new Date();
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return {
+    from: start.toISOString().slice(0, 10),
+    to: now.toISOString().slice(0, 10),
+  };
 }
 
 const STATUS_LABEL: Record<ClientRequestRow["status"], string> = {
@@ -286,6 +310,7 @@ export function ClientSheet({
   revenue,
   totalMinutes,
   interventions,
+  hourlyRate,
   shareUrl,
   inboundEmail,
 }: {
@@ -309,6 +334,7 @@ export function ClientSheet({
   months: MonthBucket[];
   revenue: ClientRevenue;
   totalMinutes: number;
+  hourlyRate: number | null;
   interventions: {
     id: string;
     minutes: number;
@@ -328,33 +354,165 @@ export function ClientSheet({
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteName, setDeleteName] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const initialRange = useMemo(() => currentMonthRange(), []);
+  const [dateFrom, setDateFrom] = useState(initialRange.from);
+  const [dateTo, setDateTo] = useState(initialRange.to);
   const [showPackModal, setShowPackModal] = useState(false);
   const [packType, setPackType] = useState<"pack" | "retainer" | "hourly">(
     "pack",
   );
   const [packHours, setPackHours] = useState(10);
   const active = (contracts ?? []).find((c) => c.active);
+  const periodActive = Boolean(dateFrom || dateTo);
+
+  const filteredHistory = useMemo(() => {
+    if (!periodActive) return history;
+    return history.filter((r) =>
+      inRange(r.closedAt ?? r.updatedAt, dateFrom, dateTo),
+    );
+  }, [history, dateFrom, dateTo, periodActive]);
+
+  const filteredAll = useMemo(() => {
+    if (!periodActive) return requests;
+    return requests.filter((r) => {
+      if (r.status !== "done") return true; // open always visible in "all"
+      return inRange(r.closedAt ?? r.updatedAt, dateFrom, dateTo);
+    });
+  }, [requests, dateFrom, dateTo, periodActive]);
 
   const tableRows = useMemo(() => {
-    const base =
-      tab === "backlog" ? backlog : tab === "history" ? history : requests;
-    if (!dateFrom && !dateTo) return base;
-    return base.filter((r) => inRange(r.updatedAt, dateFrom, dateTo));
-  }, [tab, backlog, history, requests, dateFrom, dateTo]);
+    if (tab === "backlog") return backlog; // open work — not calendar-gated
+    if (tab === "history") return filteredHistory;
+    return filteredAll;
+  }, [tab, backlog, filteredHistory, filteredAll]);
 
   const filteredInterventions = useMemo(() => {
-    if (!dateFrom && !dateTo) return interventions;
+    if (!periodActive) return interventions;
     return interventions.filter((i) =>
       inRange(i.performedAt, dateFrom, dateTo),
     );
-  }, [interventions, dateFrom, dateTo]);
+  }, [interventions, dateFrom, dateTo, periodActive]);
 
   const filteredMinutes = useMemo(
     () => filteredInterventions.reduce((s, i) => s + i.minutes, 0),
     [filteredInterventions],
   );
+
+  const periodStatusCounts = useMemo((): StatusCount[] => {
+    const pool = periodActive
+      ? [
+          ...backlog,
+          ...filteredHistory,
+        ]
+      : requests;
+    const unique = new Map(pool.map((r) => [r.id, r]));
+    const order: ClientRequestRow["status"][] = [
+      "requested",
+      "in_progress",
+      "waiting_on_client",
+      "done",
+    ];
+    return order.map((status) => ({
+      status,
+      count: [...unique.values()].filter((r) => r.status === status).length,
+    }));
+  }, [periodActive, backlog, filteredHistory, requests]);
+
+  const periodMonths = useMemo((): MonthBucket[] => {
+    if (!periodActive) return months;
+    const hoursByMonth = new Map<string, number>();
+    const revenueByMonth = new Map<string, number>();
+    for (const i of filteredInterventions) {
+      const key = monthKeyFromIso(i.performedAt);
+      hoursByMonth.set(key, (hoursByMonth.get(key) ?? 0) + i.minutes / 60);
+      if (i.billingStatus === "billed" || i.billingStatus === "billable") {
+        const value =
+          interventionBillableAmount(
+            i.minutes,
+            i.agreedAmountEur,
+            hourlyRate,
+          ) ?? 0;
+        if (value > 0 && i.billingStatus === "billed") {
+          revenueByMonth.set(key, (revenueByMonth.get(key) ?? 0) + value);
+        }
+      }
+    }
+    const keys = [...new Set([...hoursByMonth.keys(), ...revenueByMonth.keys()])].sort();
+    if (keys.length === 0) {
+      // still show empty month of the selected range start
+      const key = (dateFrom || dateTo).slice(0, 7);
+      return [{ key, label: monthLabelFromKey(key), hours: 0, revenue: 0 }];
+    }
+    return keys.map((key) => ({
+      key,
+      label: monthLabelFromKey(key),
+      hours: Math.round((hoursByMonth.get(key) ?? 0) * 100) / 100,
+      revenue: Math.round((revenueByMonth.get(key) ?? 0) * 100) / 100,
+    }));
+  }, [
+    periodActive,
+    months,
+    filteredInterventions,
+    hourlyRate,
+    dateFrom,
+    dateTo,
+  ]);
+
+  const periodRevenue = useMemo((): ClientRevenue => {
+    if (!periodActive) return revenue;
+    let maintenance = 0;
+    for (const i of filteredInterventions) {
+      if (i.billingStatus !== "billed" && i.billingStatus !== "billable") continue;
+      const value =
+        interventionBillableAmount(i.minutes, i.agreedAmountEur, hourlyRate) ??
+        0;
+      if (i.billingStatus === "billed") maintenance += value;
+    }
+    // Retainers: monthly fee for each calendar month touched by the range
+    let retainers = 0;
+    const fromKey = (dateFrom || dateTo).slice(0, 7);
+    const toKey = (dateTo || dateFrom).slice(0, 7);
+    for (const c of contracts) {
+      if (c.type !== "retainer" || !c.monthlyFeeEur || c.monthlyFeeEur <= 0) {
+        continue;
+      }
+      const start = (c.startsAt ?? c.createdAt).slice(0, 7);
+      const end = c.endsAt ? c.endsAt.slice(0, 7) : toKey;
+      const [fy, fm] = fromKey.split("-").map(Number);
+      const [ty, tm] = toKey.split("-").map(Number);
+      let y = fy;
+      let m = fm;
+      while (y < ty || (y === ty && m <= tm)) {
+        const cursor = `${y}-${String(m).padStart(2, "0")}`;
+        if (cursor >= start && cursor <= end) retainers += c.monthlyFeeEur;
+        m += 1;
+        if (m > 12) {
+          m = 1;
+          y += 1;
+        }
+      }
+    }
+    maintenance = Math.round(maintenance * 100) / 100;
+    retainers = Math.round(retainers * 100) / 100;
+    return {
+      maintenance,
+      retainers,
+      proposals: 0, // propostas filtradas no período exigem dados à parte
+      total: Math.round((maintenance + retainers) * 100) / 100,
+    };
+  }, [
+    periodActive,
+    revenue,
+    filteredInterventions,
+    hourlyRate,
+    contracts,
+    dateFrom,
+    dateTo,
+  ]);
+
+  const displayStatusCounts = periodActive ? periodStatusCounts : statusCounts;
+  const displayMonths = periodActive ? periodMonths : months;
+  const displayRevenue = periodActive ? periodRevenue : revenue;
 
   function run(action: () => Promise<void>) {
     startTransition(async () => {
@@ -377,7 +535,7 @@ export function ClientSheet({
 
   return (
     <div className="desk-page flex flex-1 flex-col gap-4 py-6 lg:flex-row lg:items-start lg:gap-6">
-      {/* Main: history + backlog + charts */}
+      {/* Main: pedidos + histórico first; analysis secondary */}
       <main className="min-w-0 flex-1 space-y-5">
         <div>
           <Link
@@ -415,11 +573,8 @@ export function ClientSheet({
                   ? `${TYPE_LABEL[active.type]} · ${remainingHours(active.hoursTotal, active.hoursUsed)}h restantes`
                   : "Sem contrato ativo"}
                 {" · "}
-                {formatMinutes(
-                  dateFrom || dateTo ? filteredMinutes : totalMinutes,
-                )}{" "}
-                registadas
-                {dateFrom || dateTo ? " no período" : ""}
+                {formatMinutes(filteredMinutes)} registadas
+                {periodActive ? " no período" : ""}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -469,12 +624,9 @@ export function ClientSheet({
               type="button"
               className="rounded-md border border-border px-2 py-1.5 text-xs hover:bg-default"
               onClick={() => {
-                const now = new Date();
-                const start = new Date(
-                  Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
-                );
-                setDateFrom(start.toISOString().slice(0, 10));
-                setDateTo(now.toISOString().slice(0, 10));
+                const range = currentMonthRange();
+                setDateFrom(range.from);
+                setDateTo(range.to);
               }}
             >
               Este mês
@@ -493,7 +645,7 @@ export function ClientSheet({
             >
               Últimos 3 meses
             </button>
-            {dateFrom || dateTo ? (
+            {periodActive ? (
               <button
                 type="button"
                 className="rounded-md border border-border px-2 py-1.5 text-xs text-muted hover:bg-default"
@@ -502,7 +654,7 @@ export function ClientSheet({
                   setDateTo("");
                 }}
               >
-                Limpar
+                Todo o histórico
               </button>
             ) : null}
           </div>
@@ -512,59 +664,22 @@ export function ClientSheet({
           </p>
         </section>
 
-        {/* Revenue + charts */}
-        <section className="grid gap-3 sm:grid-cols-3">
-          <div className="rounded-xl border border-border bg-surface p-4 sm:col-span-1">
-            <p className="text-xs text-muted">Revenue cliente</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight">
-              {eur(revenue.total)}
-            </p>
-            <p className="mt-2 text-xs text-muted">
-              Manutenção {eur(revenue.maintenance)}
-              <br />
-              Avenças {eur(revenue.retainers)}
-              <br />
-              Propostas {eur(revenue.proposals)}
-            </p>
-          </div>
-          <div className="rounded-xl border border-border bg-surface p-4 sm:col-span-2">
-            <p className="mb-2 text-xs font-medium text-muted">
-              Horas por mês
-            </p>
-            <BarChart data={months} valueKey="hours" color="#60a5fa" unit="h" />
-          </div>
-        </section>
-
-        <section className="grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <p className="mb-2 text-xs font-medium text-muted">
-              Distribuição de pedidos
-            </p>
-            <StatusDonut counts={statusCounts} />
-          </div>
-          <div className="rounded-xl border border-border bg-surface p-4">
-            <p className="mb-2 text-xs font-medium text-muted">
-              Revenue por mês (€)
-            </p>
-            <BarChart
-              data={months}
-              valueKey="revenue"
-              color="#2dd4bf"
-              unit=""
-            />
-          </div>
-        </section>
-
-        {/* Backlog / history tables */}
+        {/* Pedidos + histórico — primary */}
         <section className="rounded-xl border border-border bg-surface">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
             <h2 className="text-sm font-medium">Pedidos</h2>
             <div className="flex gap-1 rounded-lg bg-default p-0.5 text-xs">
               {(
                 [
-                  ["backlog", `Backlog (${backlog.length})`],
-                  ["history", `Histórico (${history.length})`],
-                  ["all", `Todos (${requests.length})`],
+                  ["backlog", `Em aberto (${backlog.length})`],
+                  [
+                    "history",
+                    `Histórico (${periodActive ? filteredHistory.length : history.length})`,
+                  ],
+                  [
+                    "all",
+                    `Todos (${periodActive ? filteredAll.length : requests.length})`,
+                  ],
                 ] as const
               ).map(([key, label]) => (
                 <button
@@ -585,10 +700,10 @@ export function ClientSheet({
           <RequestTable
             rows={tableRows}
             empty={
-              dateFrom || dateTo
-                ? "Sem pedidos neste período."
-                : tab === "backlog"
-                  ? "Sem pedidos em aberto."
+              tab === "backlog"
+                ? "Sem pedidos em aberto."
+                : periodActive
+                  ? "Sem pedidos neste período."
                   : tab === "history"
                     ? "Ainda sem pedidos concluídos."
                     : "Sem pedidos para este cliente."
@@ -596,12 +711,11 @@ export function ClientSheet({
           />
         </section>
 
-        {/* Interventions history */}
         <section className="rounded-xl border border-border bg-surface">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
             <h2 className="text-sm font-medium">
               Histórico de intervenções
-              {dateFrom || dateTo ? " no período" : ""}
+              {periodActive ? " no período" : ""}
             </h2>
             <Link
               href="/settings?tab=interventions"
@@ -613,7 +727,7 @@ export function ClientSheet({
           {filteredInterventions.length === 0 ? (
             <p className="px-4 py-4 text-sm text-muted">
               Sem intervenções
-              {dateFrom || dateTo ? " neste período" : " registadas"}.
+              {periodActive ? " neste período" : " registadas"}.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -628,10 +742,7 @@ export function ClientSheet({
                   </tr>
                 </thead>
                 <tbody>
-                  {(dateFrom || dateTo
-                    ? filteredInterventions
-                    : filteredInterventions.slice(0, 20)
-                  ).map((i) => (
+                  {filteredInterventions.map((i) => (
                     <tr
                       key={i.id}
                       className="border-b border-separator last:border-0"
@@ -690,6 +801,63 @@ export function ClientSheet({
               </table>
             </div>
           )}
+        </section>
+
+        {/* Analysis — secondary, driven by calendar */}
+        <section className="space-y-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-sm font-medium text-muted">Análise</h2>
+            <p className="text-[11px] text-muted">
+              {periodActive
+                ? "Valores do período selecionado"
+                : "Todo o histórico"}
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-border bg-surface p-4 sm:col-span-1">
+              <p className="text-xs text-muted">Revenue no período</p>
+              <p className="mt-1 text-2xl font-semibold tracking-tight">
+                {eur(displayRevenue.total)}
+              </p>
+              <p className="mt-2 text-xs text-muted">
+                Manutenção {eur(displayRevenue.maintenance)}
+                <br />
+                Avenças {eur(displayRevenue.retainers)}
+                <br />
+                Propostas {eur(displayRevenue.proposals)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-4 sm:col-span-2">
+              <p className="mb-2 text-xs font-medium text-muted">
+                Horas por mês
+              </p>
+              <BarChart
+                data={displayMonths}
+                valueKey="hours"
+                color="#60a5fa"
+                unit="h"
+              />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <p className="mb-2 text-xs font-medium text-muted">
+                Distribuição de pedidos
+              </p>
+              <StatusDonut counts={displayStatusCounts} />
+            </div>
+            <div className="rounded-xl border border-border bg-surface p-4">
+              <p className="mb-2 text-xs font-medium text-muted">
+                Revenue por mês (€)
+              </p>
+              <BarChart
+                data={displayMonths}
+                valueKey="revenue"
+                color="#2dd4bf"
+                unit=""
+              />
+            </div>
+          </div>
         </section>
       </main>
 

@@ -6,6 +6,7 @@ import {
   closeRequestAsHours,
   closeRequestAsProjectTask,
   getRequestCloseOptions,
+  updateRequestStatus,
   type RequestCloseOptions,
 } from "@/app/actions/requests";
 
@@ -13,17 +14,27 @@ const MINUTE_OPTIONS = [30, 60, 90, 120];
 
 type Mode = "idle" | "hours" | "project";
 
+function todayInputValue() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function RequestClosePanel({
   requestId,
   requestTitle,
-  alreadyDone,
+  status,
+  closedAt,
   closeKind,
   buildTask,
   onClosed,
 }: {
   requestId: string;
   requestTitle: string;
-  alreadyDone: boolean;
+  status: "requested" | "in_progress" | "waiting_on_client" | "done";
+  closedAt: string | null;
   closeKind: "hours" | "project_task" | null;
   buildTask: {
     id: string;
@@ -33,10 +44,14 @@ export function RequestClosePanel({
   } | null;
   onClosed: () => void;
 }) {
+  const finalized = Boolean(closedAt);
+  const softDone = status === "done" && !finalized;
+
   const [mode, setMode] = useState<Mode>("idle");
   const [options, setOptions] = useState<RequestCloseOptions | null>(null);
   const [minutes, setMinutes] = useState(30);
   const [agreedAmountEur, setAgreedAmountEur] = useState("");
+  const [completedAt, setCompletedAt] = useState(todayInputValue);
   const [note, setNote] = useState("");
   const [billingStatus, setBillingStatus] = useState<
     "" | "included" | "billable" | "non_billable"
@@ -71,6 +86,18 @@ export function RequestClosePanel({
   const hasTime = minutes > 0;
   const canSubmit = hasTime || hasAmount;
 
+  function markSoftDone() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await updateRequestStatus(requestId, "done");
+        onClosed();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro ao concluir");
+      }
+    });
+  }
+
   function submitHours() {
     setError(null);
     startTransition(async () => {
@@ -81,6 +108,7 @@ export function RequestClosePanel({
           agreedAmountEur: hasAmount ? amountNum : null,
           note: note || null,
           billingStatus: billingStatus || null,
+          completedAt,
         });
         setMode("idle");
         onClosed();
@@ -111,6 +139,7 @@ export function RequestClosePanel({
           markTaskDone,
           note: note || null,
           billingStatus: billingStatus || null,
+          completedAt,
         });
         setMode("idle");
         onClosed();
@@ -120,14 +149,17 @@ export function RequestClosePanel({
     });
   }
 
-  if (alreadyDone) {
+  if (finalized) {
+    const when = closedAt
+      ? new Date(closedAt).toLocaleDateString("pt-PT")
+      : "";
     return (
       <div className="rounded-lg border border-border bg-default/40 px-3 py-2 text-xs text-muted">
         {closeKind === "hours"
-          ? "Fechado com registo no histórico (tempo / valor)."
+          ? `Fechado e registado${when ? ` em ${when}` : ""}. Saiu do pipeline.`
           : closeKind === "project_task" && buildTask
-            ? `Associado a «${buildTask.projectTitle}» · «${buildTask.title}» e registado no histórico.`
-            : "Pedido concluído."}
+            ? `Fechado${when ? ` em ${when}` : ""} · «${buildTask.projectTitle}» · «${buildTask.title}». Saiu do pipeline.`
+            : `Fechado${when ? ` em ${when}` : ""}.`}
       </div>
     );
   }
@@ -135,18 +167,41 @@ export function RequestClosePanel({
   if (mode === "idle") {
     return (
       <div className="rounded-lg border border-border px-3 py-2">
-        <p className="mb-1 text-xs font-medium text-muted">Concluir pedido</p>
-        <p className="mb-2 text-[11px] text-muted">
-          Obrigatório tempo ou valor acordado (€) para o histórico e faturação.
-        </p>
+        {softDone ? (
+          <>
+            <p className="mb-1 text-xs font-medium">Concluído — falta fechar</p>
+            <p className="mb-2 text-[11px] text-muted">
+              Regista o tempo ou valor acordado e a data. Depois sai da lista
+              Concluído e fica no histórico do cliente.
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="mb-1 text-xs font-medium text-muted">Concluir / fechar</p>
+            <p className="mb-2 text-[11px] text-muted">
+              Podes marcar como concluído agora e fechar depois com tempo/€, ou
+              fechar já e sair da lista.
+            </p>
+          </>
+        )}
         <div className="flex flex-wrap gap-2">
+          {!softDone ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              isDisabled={pending}
+              onPress={markSoftDone}
+            >
+              Marcar concluído
+            </Button>
+          ) : null}
           <Button
             size="sm"
             variant="primary"
             isDisabled={pending}
             onPress={() => setMode("hours")}
           >
-            Registar no histórico
+            Fechar e registar
           </Button>
           <Button
             size="sm"
@@ -154,15 +209,25 @@ export function RequestClosePanel({
             isDisabled={pending}
             onPress={() => setMode("project")}
           >
-            Associar a projeto
+            Fechar · projeto
           </Button>
         </div>
+        {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
       </div>
     );
   }
 
   const billingFields = (
     <>
+      <label className="flex flex-col gap-1 text-xs">
+        <span className="text-muted">Data de conclusão</span>
+        <input
+          type="date"
+          value={completedAt}
+          onChange={(e) => setCompletedAt(e.target.value)}
+          className="w-40 rounded border border-border bg-[var(--field-background)] px-2 py-1.5 text-sm"
+        />
+      </label>
       <div className="flex flex-col gap-1">
         <span className="text-[11px] text-muted">Tempo (múltiplos de 30 min)</span>
         <div className="flex flex-wrap gap-1">
@@ -215,7 +280,7 @@ export function RequestClosePanel({
       </label>
       <textarea
         rows={2}
-        placeholder="Nota (opcional)"
+        placeholder="Nota / o que foi feito (opcional)"
         value={note}
         onChange={(e) => setNote(e.target.value)}
         className="rounded border border-border bg-[var(--field-background)] px-2 py-1.5 text-sm"
@@ -242,7 +307,7 @@ export function RequestClosePanel({
       <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-xs font-medium">
           {mode === "hours"
-            ? "Fechar · histórico / faturação"
+            ? "Fechar · registo no histórico"
             : "Fechar · projeto + histórico"}
         </p>
         <button
@@ -265,7 +330,7 @@ export function RequestClosePanel({
             isDisabled={pending || !canSubmit}
             onPress={submitHours}
           >
-            {pending ? "A guardar…" : "Fechar e registar"}
+            {pending ? "A guardar…" : "Fechar, registar e sair da lista"}
           </Button>
         </div>
       ) : (
@@ -334,7 +399,7 @@ export function RequestClosePanel({
                 isDisabled={pending || !canSubmit}
                 onPress={submitProject}
               >
-                {pending ? "A guardar…" : "Fechar, associar e registar"}
+                {pending ? "A guardar…" : "Fechar, registar e sair da lista"}
               </Button>
             </>
           )}
