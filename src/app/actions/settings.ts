@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
+import {
+  DEFAULT_PLATFORM_CONFIG,
+  getPlatformConfig,
+  type PlatformConfigData,
+} from "@/lib/platform-config";
 import { prisma } from "@/lib/prisma";
 
 function optionalNumber(raw: string): number | null {
@@ -20,77 +25,169 @@ function optionalInt(raw: string, fallback: number): number {
   return Math.round(n);
 }
 
+type PlatformSection =
+  | "vat"
+  | "company"
+  | "rates"
+  | "proposals"
+  | "time"
+  | "locale"
+  | "full";
+
+function parseSection(raw: string): PlatformSection {
+  if (
+    raw === "vat" ||
+    raw === "company" ||
+    raw === "rates" ||
+    raw === "proposals" ||
+    raw === "time" ||
+    raw === "locale" ||
+    raw === "full"
+  ) {
+    return raw;
+  }
+  return "full";
+}
+
+function toDbRow(config: PlatformConfigData) {
+  return {
+    pricesIncludeVat: config.pricesIncludeVat,
+    showQuarterWithVat: config.showQuarterWithVat,
+    vatRatePercent: config.vatRatePercent,
+    defaultCostRateEur: config.defaultCostRateEur,
+    defaultBillingRateEur: config.defaultBillingRateEur,
+    companyName: config.companyName || null,
+    companyNif: config.companyNif || null,
+    companyAddress: config.companyAddress || null,
+    companyEmail: config.companyEmail || null,
+    companyPhone: config.companyPhone || null,
+    companyIban: config.companyIban || null,
+    companyWebsite: config.companyWebsite || null,
+    proposalFooter: config.proposalFooter || null,
+    timeRoundingMinutes: config.timeRoundingMinutes,
+    timeMinimumMinutes: config.timeMinimumMinutes,
+    currency: config.currency,
+    locale: config.locale,
+    fiscalYearStartMonth: config.fiscalYearStartMonth,
+  };
+}
+
 export async function updatePlatformConfig(formData: FormData) {
   await requireAdmin();
 
-  const pricesIncludeVat = formData.get("pricesIncludeVat") === "on";
-  const showQuarterWithVat = formData.get("showQuarterWithVat") === "on";
-  const vatRatePercent = Number(formData.get("vatRatePercent") ?? 23);
-  const defaultCostRateEur = optionalNumber(
-    String(formData.get("defaultCostRateEur") ?? ""),
-  );
-  const defaultBillingRateEur = optionalNumber(
-    String(formData.get("defaultBillingRateEur") ?? ""),
-  );
+  const section = parseSection(String(formData.get("_section") ?? "full"));
+  const current = await getPlatformConfig();
+  const next: PlatformConfigData = { ...current };
 
-  const companyName = String(formData.get("companyName") ?? "").trim() || null;
-  const companyNif = String(formData.get("companyNif") ?? "").trim() || null;
-  const companyAddress =
-    String(formData.get("companyAddress") ?? "").trim() || null;
-  const companyEmail =
-    String(formData.get("companyEmail") ?? "").trim() || null;
-  const companyPhone =
-    String(formData.get("companyPhone") ?? "").trim() || null;
-  const companyIban = String(formData.get("companyIban") ?? "").trim() || null;
-  const companyWebsite =
-    String(formData.get("companyWebsite") ?? "").trim() || null;
-  const proposalFooter =
-    String(formData.get("proposalFooter") ?? "").trim() || null;
-
-  const timeRoundingMinutes = optionalInt(
-    String(formData.get("timeRoundingMinutes") ?? "30"),
-    30,
-  );
-  const timeMinimumMinutes = optionalInt(
-    String(formData.get("timeMinimumMinutes") ?? "30"),
-    30,
-  );
-  const currency =
-    String(formData.get("currency") ?? "EUR").trim().toUpperCase() || "EUR";
-  const locale = String(formData.get("locale") ?? "pt-PT").trim() || "pt-PT";
-  const fiscalYearStartMonth = Math.min(
-    12,
-    Math.max(
-      1,
-      optionalInt(String(formData.get("fiscalYearStartMonth") ?? "1"), 1),
-    ),
-  );
-
-  if (!Number.isFinite(vatRatePercent) || vatRatePercent < 0 || vatRatePercent > 100) {
-    throw new Error("Taxa de IVA inválida");
+  if (section === "vat" || section === "full") {
+    // Checkboxes: absent means false when this section is being saved.
+    next.pricesIncludeVat = formData.get("pricesIncludeVat") === "on";
+    next.showQuarterWithVat = formData.get("showQuarterWithVat") === "on";
+    if (formData.has("vatRatePercent")) {
+      const vatRatePercent = Number(formData.get("vatRatePercent") ?? 23);
+      if (
+        !Number.isFinite(vatRatePercent) ||
+        vatRatePercent < 0 ||
+        vatRatePercent > 100
+      ) {
+        throw new Error("Taxa de IVA inválida");
+      }
+      next.vatRatePercent = vatRatePercent;
+    }
+    if (formData.has("defaultCostRateEur")) {
+      next.defaultCostRateEur = optionalNumber(
+        String(formData.get("defaultCostRateEur") ?? ""),
+      );
+    }
   }
-  if (currency.length !== 3) throw new Error("Moeda inválida (ex. EUR)");
 
-  const data = {
-    pricesIncludeVat,
-    showQuarterWithVat,
-    vatRatePercent,
-    defaultCostRateEur,
-    defaultBillingRateEur,
-    companyName,
-    companyNif,
-    companyAddress,
-    companyEmail,
-    companyPhone,
-    companyIban,
-    companyWebsite,
-    proposalFooter,
-    timeRoundingMinutes,
-    timeMinimumMinutes,
-    currency,
-    locale,
-    fiscalYearStartMonth,
-  };
+  if (section === "company" || section === "full") {
+    if (formData.has("companyName")) {
+      next.companyName =
+        String(formData.get("companyName") ?? "").trim() ||
+        DEFAULT_PLATFORM_CONFIG.companyName;
+    }
+    if (formData.has("companyNif")) {
+      next.companyNif = String(formData.get("companyNif") ?? "").trim();
+    }
+    if (formData.has("companyAddress")) {
+      next.companyAddress = String(formData.get("companyAddress") ?? "").trim();
+    }
+    if (formData.has("companyEmail")) {
+      next.companyEmail = String(formData.get("companyEmail") ?? "").trim();
+    }
+    if (formData.has("companyPhone")) {
+      next.companyPhone = String(formData.get("companyPhone") ?? "").trim();
+    }
+    if (formData.has("companyIban")) {
+      next.companyIban = String(formData.get("companyIban") ?? "").trim();
+    }
+    if (formData.has("companyWebsite")) {
+      next.companyWebsite =
+        String(formData.get("companyWebsite") ?? "").trim() ||
+        DEFAULT_PLATFORM_CONFIG.companyWebsite;
+    }
+  }
+
+  if (section === "rates" || section === "full") {
+    if (formData.has("defaultCostRateEur")) {
+      next.defaultCostRateEur = optionalNumber(
+        String(formData.get("defaultCostRateEur") ?? ""),
+      );
+    }
+    if (formData.has("defaultBillingRateEur")) {
+      next.defaultBillingRateEur = optionalNumber(
+        String(formData.get("defaultBillingRateEur") ?? ""),
+      );
+    }
+  }
+
+  if (section === "proposals" || section === "full") {
+    if (formData.has("proposalFooter")) {
+      next.proposalFooter =
+        String(formData.get("proposalFooter") ?? "").trim() ||
+        DEFAULT_PLATFORM_CONFIG.proposalFooter;
+    }
+  }
+
+  if (section === "time" || section === "full") {
+    if (formData.has("timeRoundingMinutes")) {
+      next.timeRoundingMinutes = optionalInt(
+        String(formData.get("timeRoundingMinutes") ?? "30"),
+        30,
+      );
+    }
+    if (formData.has("timeMinimumMinutes")) {
+      next.timeMinimumMinutes = optionalInt(
+        String(formData.get("timeMinimumMinutes") ?? "30"),
+        30,
+      );
+    }
+  }
+
+  if (section === "locale" || section === "full") {
+    if (formData.has("currency")) {
+      const currency =
+        String(formData.get("currency") ?? "EUR").trim().toUpperCase() || "EUR";
+      if (currency.length !== 3) throw new Error("Moeda inválida (ex. EUR)");
+      next.currency = currency;
+    }
+    if (formData.has("locale")) {
+      next.locale =
+        String(formData.get("locale") ?? "pt-PT").trim() || "pt-PT";
+    }
+    if (formData.has("fiscalYearStartMonth")) {
+      next.fiscalYearStartMonth = Math.min(
+        12,
+        Math.max(
+          1,
+          optionalInt(String(formData.get("fiscalYearStartMonth") ?? "1"), 1),
+        ),
+      );
+    }
+  }
+
+  const data = toDbRow(next);
 
   const delegate = (
     prisma as {
@@ -117,12 +214,12 @@ export async function updatePlatformConfig(formData: FormData) {
         \`currency\`, \`locale\`, \`fiscalYearStartMonth\`,
         \`createdAt\`, \`updatedAt\`
       ) VALUES (
-        'default', ${pricesIncludeVat}, ${showQuarterWithVat}, ${vatRatePercent},
-        ${defaultCostRateEur}, ${defaultBillingRateEur},
-        ${companyName}, ${companyNif}, ${companyAddress}, ${companyEmail},
-        ${companyPhone}, ${companyIban}, ${companyWebsite}, ${proposalFooter},
-        ${timeRoundingMinutes}, ${timeMinimumMinutes},
-        ${currency}, ${locale}, ${fiscalYearStartMonth},
+        'default', ${data.pricesIncludeVat}, ${data.showQuarterWithVat}, ${data.vatRatePercent},
+        ${data.defaultCostRateEur}, ${data.defaultBillingRateEur},
+        ${data.companyName}, ${data.companyNif}, ${data.companyAddress}, ${data.companyEmail},
+        ${data.companyPhone}, ${data.companyIban}, ${data.companyWebsite}, ${data.proposalFooter},
+        ${data.timeRoundingMinutes}, ${data.timeMinimumMinutes},
+        ${data.currency}, ${data.locale}, ${data.fiscalYearStartMonth},
         NOW(3), NOW(3)
       )
       ON DUPLICATE KEY UPDATE

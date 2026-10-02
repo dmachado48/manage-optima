@@ -1,8 +1,6 @@
 export function assertValidMinutes(minutes: number): void {
-  if (!Number.isInteger(minutes) || minutes <= 0 || minutes % 30 !== 0) {
-    throw new Error(
-      "As intervenções devem ser múltiplos positivos de 30 minutos.",
-    );
+  if (!Number.isInteger(minutes) || minutes <= 0) {
+    throw new Error("Os minutos devem ser um número positivo.");
   }
 }
 
@@ -33,7 +31,7 @@ export function assertCloseableBilling(input: {
 
   if (minutes <= 0 && agreedAmountEur == null) {
     throw new Error(
-      "Indica tempo (múltiplos de 30 min) ou um valor acordado (€) para registar no histórico e faturar.",
+      "Indica tempo ou um valor acordado (€) para registar no histórico e faturar.",
     );
   }
 

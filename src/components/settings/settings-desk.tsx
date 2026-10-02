@@ -17,6 +17,7 @@ import {
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
 import { markContractBilled } from "@/app/actions/commercial";
+import { PlatformPanels } from "@/components/settings/platform-panels";
 import {
   INTERVENTION_BILLING_LABELS,
   CONTRACT_TYPE_LABELS,
@@ -27,7 +28,6 @@ import { formatDatePt, formatMinutes } from "@/lib/dates";
 import type { FinanceActuals } from "@/lib/finance";
 import {
   amountsWithAndWithoutVat,
-  calcHourlyRate,
   mapActualsForDisplay,
   vatLabel,
   type PlatformConfigData,
@@ -131,8 +131,6 @@ export function SettingsDesk({
     useState<BillingReportPreview | null>(null);
   const [copied, setCopied] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
-  const [calcTotal, setCalcTotal] = useState("");
-  const [calcHours, setCalcHours] = useState("");
   const [platformSaved, setPlatformSaved] = useState(false);
 
   const displayActuals = useMemo(
@@ -150,8 +148,6 @@ export function SettingsDesk({
   /** null = year (geral); 0–3 = quarter filter */
   const [selectedQuarter, setSelectedQuarter] = useState<number | null>(null);
   const [effortHint, setEffortHint] = useState<string | null>(null);
-
-  const calcRate = calcHourlyRate(Number(calcTotal), Number(calcHours));
 
   const cq = currentQuarterIndex();
   const pace =
@@ -1402,6 +1398,7 @@ export function SettingsDesk({
               className="flex flex-col gap-4"
               action={(fd) => {
                 startTransition(async () => {
+                  fd.set("_section", "vat");
                   await updatePlatformConfig(fd);
                   setPlatformSaved(true);
                   setTimeout(() => setPlatformSaved(false), 2500);
@@ -1409,6 +1406,7 @@ export function SettingsDesk({
                 });
               }}
             >
+              <input type="hidden" name="_section" value="vat" />
               <label className="flex items-start gap-3 text-sm">
                 <input
                   type="checkbox"
@@ -1600,122 +1598,41 @@ export function SettingsDesk({
                 ) : null}
               </div>
             </form>
-          </section>
-
-          <section className="rounded-xl border border-border bg-surface p-4">
-            <h2 className="mb-1 text-sm font-medium">
-              Calculadora valor/hora
-            </h2>
-            <p className="mb-4 text-xs text-muted">
-              Calcula a taxa horária a partir do total do projeto e das horas
-              estimadas (total ÷ horas).
-            </p>
-            <div className="flex flex-wrap items-end gap-3">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs text-muted">Total do projeto (€)</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={calcTotal}
-                  onChange={(e) => setCalcTotal(e.target.value)}
-                  placeholder="ex. 4800"
-                  className="w-40 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs text-muted">Horas estimadas</span>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  value={calcHours}
-                  onChange={(e) => setCalcHours(e.target.value)}
-                  placeholder="ex. 40"
-                  className="w-36 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-                />
-              </label>
-              <div className="rounded-lg bg-default px-4 py-2">
-                <p className="text-xs text-muted">Valor / hora</p>
-                <p className="text-lg font-semibold tabular-nums">
-                  {calcRate != null ? `${calcRate.toFixed(2)} €/h` : "—"}
-                </p>
-              </div>
-              {calcRate != null ? (
-                <Button
-                  variant="secondary"
-                  isDisabled={pending}
-                  onPress={() => {
-                    startTransition(async () => {
-                      const fd = new FormData();
-                      if (platformConfig.pricesIncludeVat) {
-                        fd.set("pricesIncludeVat", "on");
-                      }
-                      if (platformConfig.showQuarterWithVat) {
-                        fd.set("showQuarterWithVat", "on");
-                      }
-                      fd.set(
-                        "vatRatePercent",
-                        String(platformConfig.vatRatePercent),
-                      );
-                      fd.set("defaultCostRateEur", String(calcRate));
-                      await updatePlatformConfig(fd);
-                      setPlatformSaved(true);
-                      setTimeout(() => setPlatformSaved(false), 2500);
-                      router.refresh();
-                    });
-                  }}
-                >
-                  Usar como taxa padrão
-                </Button>
-              ) : null}
+            <div className="mt-4 rounded-lg border border-dashed border-border bg-default/30 px-3 py-3 text-xs text-muted">
+              <p className="font-medium text-foreground">Em produção</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-4">
+                <li>
+                  Fazer deploy (`npm run deploy`) para aplicar schema + código
+                  dos alertas.
+                </li>
+                <li>
+                  No servidor: garantir `npx prisma db push` (o script de deploy
+                  já o faz) e restart Passenger.
+                </li>
+                <li>
+                  Ligar aqui os tipos desejados (Para registar + som).
+                </li>
+                <li>
+                  Abrir a mesa autenticado — o lembrete sonoro corre no browser
+                  (precisa de interação prévia na página para o áudio).
+                </li>
+                <li>
+                  Banners «Para faturar / Atingiu / Deadline» aparecem em Hoje e
+                  Comercial quando há dados.
+                </li>
+              </ol>
             </div>
           </section>
 
-          <section className="rounded-xl border border-border bg-surface p-4">
-            <h2 className="mb-1 text-sm font-medium">
-              Outras definições úteis
-            </h2>
-            <p className="mb-3 text-xs text-muted">
-              Sugestões para próximas iterações — ainda não configuráveis aqui.
-            </p>
-            <ul className="grid gap-2 text-sm sm:grid-cols-2">
-              {[
-                [
-                  "Dados da empresa",
-                  "NIF, morada, IBAN e contactos para propostas e faturas",
-                ],
-                [
-                  "Tarifa de faturação padrão",
-                  "€/h default para contratos horário / overage",
-                ],
-                [
-                  "Rodapé das propostas",
-                  "Texto legal, validade e condições padrão",
-                ],
-                [
-                  "Arredondamento de tempo",
-                  "Blocos de 15/30 min e mínimo faturável",
-                ],
-                [
-                  "Moeda e locale",
-                  "EUR / pt-PT (já usado) com opção de override",
-                ],
-                [
-                  "Ano fiscal",
-                  "Se o ano comercial não coincidir com o calendário",
-                ],
-              ].map(([title, desc]) => (
-                <li
-                  key={title}
-                  className="rounded-lg border border-dashed border-border px-3 py-2"
-                >
-                  <p className="font-medium">{title}</p>
-                  <p className="text-xs text-muted">{desc}</p>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {(
+            ["company", "rates", "proposals", "time", "locale"] as const
+          ).map((section) => (
+            <PlatformPanels
+              key={section}
+              section={section}
+              platformConfig={platformConfig}
+            />
+          ))}
         </div>
       ) : null}
 
@@ -1724,6 +1641,7 @@ export function SettingsDesk({
           clients={clients}
           editing={editContract}
           defaultClientId={clientId || undefined}
+          defaultBillingRateEur={platformConfig.defaultBillingRateEur}
           pending={pending}
           onClose={() => {
             setShowContract(false);
@@ -1751,6 +1669,7 @@ function ContractModal({
   clients,
   editing,
   defaultClientId,
+  defaultBillingRateEur,
   pending,
   onClose,
   onSubmit,
@@ -1758,6 +1677,7 @@ function ContractModal({
   clients: ClientOption[];
   editing: ContractRow | null;
   defaultClientId?: string;
+  defaultBillingRateEur?: number | null;
   pending: boolean;
   onClose: () => void;
   onSubmit: (fd: FormData) => void;
@@ -1860,7 +1780,9 @@ function ContractModal({
               type="number"
               step="0.01"
               min="0"
-              defaultValue={editing?.hourlyRate ?? ""}
+              defaultValue={
+                editing?.hourlyRate ?? defaultBillingRateEur ?? ""
+              }
               placeholder="Tarifa €/h (opcional)"
               className="rounded-lg border border-border px-3 py-2 text-sm"
             />

@@ -8,6 +8,7 @@ import {
   hoursFromMinutes,
   shouldDeduct,
 } from "@/lib/billing";
+import { getPlatformConfig, roundLoggedMinutes } from "@/lib/platform-config";
 import { prisma } from "@/lib/prisma";
 import type { InterventionBillingStatus, Prisma } from "@prisma/client";
 
@@ -68,10 +69,15 @@ function revalidateInterventionPaths(clientId?: string) {
 
 export async function logIntervention(input: QuickLogInput) {
   const session = await requireAdmin();
-  const { minutes, agreedAmountEur } = assertCloseableBilling({
+  const platform = await getPlatformConfig();
+  let { minutes, agreedAmountEur } = assertCloseableBilling({
     minutes: input.minutes,
     agreedAmountEur: input.agreedAmountEur,
   });
+
+  if (minutes > 0) {
+    minutes = roundLoggedMinutes(minutes, platform);
+  }
 
   const client = await prisma.client.findUnique({
     where: { id: input.clientId },

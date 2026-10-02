@@ -139,6 +139,7 @@ export function PlatformPanels({
 
   function save(fd: FormData) {
     startTransition(async () => {
+      fd.set("_section", section);
       await updatePlatformConfig(fd);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
@@ -360,22 +361,9 @@ export function PlatformPanels({
                 variant="secondary"
                 isDisabled={pending}
                 onPress={() => {
-                  const fd = new FormData();
-                  // Rebuild from current config + new cost rate
-                  const fake = document.createElement("form");
-                  void fake;
                   startTransition(async () => {
                     const payload = new FormData();
-                    if (platformConfig.pricesIncludeVat) {
-                      payload.set("pricesIncludeVat", "on");
-                    }
-                    if (platformConfig.showQuarterWithVat) {
-                      payload.set("showQuarterWithVat", "on");
-                    }
-                    payload.set(
-                      "vatRatePercent",
-                      String(platformConfig.vatRatePercent),
-                    );
+                    payload.set("_section", "rates");
                     payload.set("defaultCostRateEur", String(calcRate));
                     payload.set(
                       "defaultBillingRateEur",
@@ -383,43 +371,11 @@ export function PlatformPanels({
                         ? String(platformConfig.defaultBillingRateEur)
                         : "",
                     );
-                    payload.set("companyName", platformConfig.companyName);
-                    payload.set("companyNif", platformConfig.companyNif);
-                    payload.set(
-                      "companyAddress",
-                      platformConfig.companyAddress,
-                    );
-                    payload.set("companyEmail", platformConfig.companyEmail);
-                    payload.set("companyPhone", platformConfig.companyPhone);
-                    payload.set("companyIban", platformConfig.companyIban);
-                    payload.set(
-                      "companyWebsite",
-                      platformConfig.companyWebsite,
-                    );
-                    payload.set(
-                      "proposalFooter",
-                      platformConfig.proposalFooter,
-                    );
-                    payload.set(
-                      "timeRoundingMinutes",
-                      String(platformConfig.timeRoundingMinutes),
-                    );
-                    payload.set(
-                      "timeMinimumMinutes",
-                      String(platformConfig.timeMinimumMinutes),
-                    );
-                    payload.set("currency", platformConfig.currency);
-                    payload.set("locale", platformConfig.locale);
-                    payload.set(
-                      "fiscalYearStartMonth",
-                      String(platformConfig.fiscalYearStartMonth),
-                    );
                     await updatePlatformConfig(payload);
                     setSaved(true);
                     setTimeout(() => setSaved(false), 2500);
                     router.refresh();
                   });
-                  void fd;
                 }}
               >
                 Usar como custo padrão
