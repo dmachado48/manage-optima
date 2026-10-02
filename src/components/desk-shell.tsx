@@ -14,6 +14,7 @@ const MODULES = [
   { href: "/pipeline", label: "Pipeline", short: "Pipe." },
   { href: "/inbox", label: "Inbox", short: "Inbox" },
   { href: "/clients", label: "Clientes", short: "Clientes" },
+  { href: "/finance", label: "Financeiro", short: "Fin." },
   { href: "/maintenance", label: "Manutenção", short: "Manut." },
   { href: "/commercial", label: "Comercial", short: "Comerc." },
   { href: "/projects", label: "Projetos", short: "Proj." },

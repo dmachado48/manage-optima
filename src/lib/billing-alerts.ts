@@ -96,7 +96,7 @@ export async function getBillingAlerts(): Promise<BillingAlert[]> {
       clientName: `${billableGroups.length} cliente(s)`,
       label: "Intervenções por faturar",
       detail: `${totalRows} registos · ${(totalMinutes / 60).toFixed(1)}h`,
-      href: "/settings?tab=interventions",
+      href: "/finance",
     });
   }
 

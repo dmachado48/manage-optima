@@ -11,6 +11,7 @@ import {
   updateClient,
 } from "@/app/actions/clients";
 import { setInterventionBillingStatusForm } from "@/app/actions/interventions";
+import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 import {
   CONTRACT_TYPE_LABELS,
   DEFAULT_AVENCA_JOB_MD,
@@ -237,9 +238,11 @@ function StatusDonut({ counts }: { counts: StatusCount[] }) {
 function RequestTable({
   rows,
   empty,
+  onOpen,
 }: {
   rows: ClientRequestRow[];
   empty: string;
+  onOpen?: (id: string) => void;
 }) {
   if (rows.length === 0) {
     return <p className="px-1 py-4 text-sm text-muted">{empty}</p>;
@@ -259,9 +262,19 @@ function RequestTable({
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.id} className="border-b border-separator last:border-0">
+            <tr
+              key={r.id}
+              className={
+                onOpen
+                  ? "cursor-pointer border-b border-separator last:border-0 hover:bg-default/50"
+                  : "border-b border-separator last:border-0"
+              }
+              onClick={() => onOpen?.(r.id)}
+            >
               <td className="px-3 py-2.5">
-                <p className="font-medium leading-snug">{r.title}</p>
+                <p className="font-medium leading-snug underline-offset-2 group-hover:underline">
+                  {r.title}
+                </p>
                 {r.description ? (
                   <p className="mt-0.5 line-clamp-1 text-xs text-muted">
                     {r.description}
@@ -362,6 +375,7 @@ export function ClientSheet({
     "pack",
   );
   const [packHours, setPackHours] = useState(10);
+  const [openRequestId, setOpenRequestId] = useState<string | null>(null);
   const active = (contracts ?? []).find((c) => c.active);
   const periodActive = Boolean(dateFrom || dateTo);
 
@@ -699,6 +713,7 @@ export function ClientSheet({
           </div>
           <RequestTable
             rows={tableRows}
+            onOpen={setOpenRequestId}
             empty={
               tab === "backlog"
                 ? "Sem pedidos em aberto."
@@ -718,10 +733,10 @@ export function ClientSheet({
               {periodActive ? " no período" : ""}
             </h2>
             <Link
-              href="/settings?tab=interventions"
+              href="/finance"
               className="text-xs text-muted underline-offset-2 hover:underline"
             >
-              Ver todas em Definições
+              Abrir financeiro
             </Link>
           </div>
           {filteredInterventions.length === 0 ? (
@@ -1335,6 +1350,15 @@ export function ClientSheet({
             </form>
           </div>
         </div>
+      ) : null}
+
+      {openRequestId ? (
+        <RequestDetailModal
+          requestId={openRequestId}
+          mode="admin"
+          onClose={() => setOpenRequestId(null)}
+          onChanged={() => router.refresh()}
+        />
       ) : null}
     </div>
   );
