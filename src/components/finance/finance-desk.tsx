@@ -9,6 +9,7 @@ import {
   setInterventionBillingStatusForm,
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
+import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 import {
   INTERVENTION_BILLING_LABELS,
   interventionBillableAmount,
@@ -75,6 +76,7 @@ export function FinanceDesk({
   const [dateTo, setDateTo] = useState(initial.to);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkError, setBulkError] = useState<string | null>(null);
+  const [openRequestId, setOpenRequestId] = useState<string | null>(null);
   const [reportPreview, setReportPreview] = useState<{
     batchCode: string;
     body: string;
@@ -411,7 +413,13 @@ export function FinanceDesk({
                       </Link>
                     </td>
                     <td className="px-3 py-2.5">
-                      <p>{i.requestTitle}</p>
+                      <button
+                        type="button"
+                        className="text-left font-medium underline-offset-2 hover:underline"
+                        onClick={() => setOpenRequestId(i.requestId)}
+                      >
+                        {i.requestTitle}
+                      </button>
                       {i.note ? (
                         <p className="line-clamp-1 text-xs text-muted">
                           {i.note}
@@ -500,6 +508,15 @@ export function FinanceDesk({
             </pre>
           </div>
         </div>
+      ) : null}
+
+      {openRequestId ? (
+        <RequestDetailModal
+          requestId={openRequestId}
+          mode="admin"
+          onClose={() => setOpenRequestId(null)}
+          onChanged={() => router.refresh()}
+        />
       ) : null}
     </div>
   );

@@ -8,13 +8,19 @@ import type {
   RequestSource,
 } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth";
-import { assertCloseableBilling } from "@/lib/billing";
+import {
+  assertCloseableBilling,
+  hoursFromMinutes,
+  shouldDeduct,
+} from "@/lib/billing";
 import { logIntervention } from "@/app/actions/interventions";
+import { getPlatformConfig, roundLoggedMinutes } from "@/lib/platform-config";
 import { prisma } from "@/lib/prisma";
 
 function revalidateRequest(clientId: string, projectId?: string | null) {
   revalidatePath("/maintenance");
   revalidatePath("/pipeline");
+  revalidatePath("/finance");
   revalidatePath("/clients");
   revalidatePath(`/clients/${clientId}`);
   revalidatePath(`/clients/${clientId}/trabalhos`);
@@ -356,4 +362,212 @@ export async function closeRequestAsProjectTask(input: {
     closedAt: closedAt.toISOString(),
     ...result,
   };
+}
+
+export type RequestRegistration = {
+  interventionId: string;
+  minutes: number;
+  agreedAmountEur: number | null;
+  note: string | null;
+  billingStatus: InterventionBillingStatus;
+  performedAt: string;
+  editable: boolean;
+};
+
+/** Latest close registration for a request (if any). */
+export async function getRequestRegistration(
+  requestId: string,
+): Promise<RequestRegistration | null> {
+  await requireAdmin();
+  const intervention = await prisma.intervention.findFirst({
+    where: { requestId },
+    orderBy: { performedAt: "desc" },
+    select: {
+      id: true,
+      minutes: true,
+      agreedAmountEur: true,
+      note: true,
+      billingStatus: true,
+      performedAt: true,
+    },
+  });
+  if (!intervention) return null;
+  return {
+    interventionId: intervention.id,
+    minutes: intervention.minutes,
+    agreedAmountEur:
+      intervention.agreedAmountEur == null
+        ? null
+        : Number(intervention.agreedAmountEur),
+    note: intervention.note,
+    billingStatus: intervention.billingStatus,
+    performedAt: intervention.performedAt.toISOString(),
+    editable: intervention.billingStatus !== "billed",
+  };
+}
+
+/**
+ * Update time/€ registration while still open for invoicing
+ * (not yet billed). Also syncs request.closedAt to the work date.
+ */
+export async function updateRequestRegistration(input: {
+  requestId: string;
+  minutes?: number | null;
+  agreedAmountEur?: number | null;
+  note?: string | null;
+  billingStatus?: InterventionBillingStatus | null;
+  completedAt?: string | null;
+}) {
+  await requireAdmin();
+  const billing = assertCloseableBilling({
+    minutes: input.minutes,
+    agreedAmountEur: input.agreedAmountEur,
+  });
+  const platform = await getPlatformConfig();
+  let minutes = billing.minutes;
+  if (minutes > 0) {
+    minutes = roundLoggedMinutes(minutes, platform);
+  }
+  const performedAt = parseCompletionDate(input.completedAt);
+
+  const request = await prisma.request.findUnique({
+    where: { id: input.requestId },
+    select: { id: true, clientId: true, closedAt: true },
+  });
+  if (!request) throw new Error("Pedido não encontrado");
+
+  const intervention = await prisma.intervention.findFirst({
+    where: { requestId: request.id },
+    orderBy: { performedAt: "desc" },
+  });
+  if (!intervention) {
+    throw new Error("Este pedido ainda não tem registo no histórico");
+  }
+  if (intervention.billingStatus === "billed") {
+    throw new Error("Não podes editar um registo já faturado");
+  }
+
+  const allowedBilling = ["included", "billable", "non_billable"] as const;
+  const nextBilling: InterventionBillingStatus =
+    input.billingStatus &&
+    (allowedBilling as readonly string[]).includes(input.billingStatus)
+      ? input.billingStatus
+      : intervention.billingStatus;
+
+  await prisma.$transaction(async (tx) => {
+    const active = await tx.contract.findFirst({
+      where: { clientId: request.clientId, active: true },
+    });
+
+    const oldIncluded =
+      intervention.billingStatus === "included" &&
+      intervention.minutes > 0 &&
+      active &&
+      shouldDeduct(active.type);
+    const newIncluded =
+      nextBilling === "included" &&
+      minutes > 0 &&
+      active &&
+      shouldDeduct(active.type);
+
+    if (active && (oldIncluded || newIncluded)) {
+      let hoursUsed = Number(active.hoursUsed);
+      if (oldIncluded) {
+        hoursUsed -= hoursFromMinutes(intervention.minutes);
+      }
+      if (newIncluded) {
+        hoursUsed += hoursFromMinutes(minutes);
+      }
+      await tx.contract.update({
+        where: { id: active.id },
+        data: { hoursUsed: Math.max(0, hoursUsed) },
+      });
+    }
+
+    await tx.intervention.update({
+      where: { id: intervention.id },
+      data: {
+        minutes,
+        agreedAmountEur:
+          billing.agreedAmountEur != null
+            ? billing.agreedAmountEur.toFixed(2)
+            : null,
+        note: input.note?.trim() || null,
+        billingStatus: nextBilling,
+        performedAt,
+        billedAt: null,
+      },
+    });
+
+    if (request.closedAt) {
+      await tx.request.update({
+        where: { id: request.id },
+        data: { closedAt: performedAt },
+      });
+    }
+  });
+
+  revalidateRequest(request.clientId);
+  return { ok: true as const };
+}
+
+/** Reopen a finalized request back into the pipeline (keeps history). */
+export async function reopenRequest(requestId: string) {
+  await requireAdmin();
+  const request = await prisma.request.findUnique({
+    where: { id: requestId },
+    select: {
+      id: true,
+      clientId: true,
+      closedAt: true,
+      interventions: {
+        where: { billingStatus: "billed" },
+        take: 1,
+        select: { id: true },
+      },
+    },
+  });
+  if (!request) throw new Error("Pedido não encontrado");
+  if (request.interventions.length > 0) {
+    throw new Error(
+      "Pedido já faturado — não podes reabrir. Cria um pedido novo se precisares.",
+    );
+  }
+
+  await prisma.request.update({
+    where: { id: request.id },
+    data: {
+      status: "in_progress",
+      closedAt: null,
+      closeKind: null,
+    },
+  });
+
+  revalidateRequest(request.clientId);
+  return { ok: true as const };
+}
+
+export async function updateRequestDetails(input: {
+  requestId: string;
+  title: string;
+  description?: string | null;
+}) {
+  await requireAdmin();
+  const title = input.title.trim();
+  if (!title) throw new Error("Título obrigatório");
+
+  const updated = await prisma.request.update({
+    where: { id: input.requestId },
+    data: {
+      title: title.slice(0, 200),
+      description:
+        input.description === undefined
+          ? undefined
+          : input.description?.trim() || null,
+    },
+    select: { clientId: true },
+  });
+
+  revalidateRequest(updated.clientId);
+  return { ok: true as const };
 }

@@ -6,16 +6,31 @@ import {
   closeRequestAsHours,
   closeRequestAsProjectTask,
   getRequestCloseOptions,
+  getRequestRegistration,
+  reopenRequest,
+  updateRequestRegistration,
   updateRequestStatus,
   type RequestCloseOptions,
+  type RequestRegistration,
 } from "@/app/actions/requests";
+import { INTERVENTION_BILLING_LABELS } from "@/lib/billing";
 
 const MINUTE_OPTIONS = [30, 60, 90, 120];
 
-type Mode = "idle" | "hours" | "project";
+type Mode = "idle" | "hours" | "project" | "edit";
 
 function todayInputValue() {
   const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function toDateInput(iso: string | null) {
+  if (!iso) return todayInputValue();
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return todayInputValue();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
@@ -49,6 +64,9 @@ export function RequestClosePanel({
 
   const [mode, setMode] = useState<Mode>("idle");
   const [options, setOptions] = useState<RequestCloseOptions | null>(null);
+  const [registration, setRegistration] = useState<RequestRegistration | null>(
+    null,
+  );
   const [minutes, setMinutes] = useState(30);
   const [agreedAmountEur, setAgreedAmountEur] = useState("");
   const [completedAt, setCompletedAt] = useState(todayInputValue);
@@ -64,7 +82,22 @@ export function RequestClosePanel({
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
-    if (mode === "idle") return;
+    if (!finalized) {
+      setRegistration(null);
+      return;
+    }
+    startTransition(async () => {
+      try {
+        const data = await getRequestRegistration(requestId);
+        setRegistration(data);
+      } catch {
+        setRegistration(null);
+      }
+    });
+  }, [finalized, requestId, closedAt]);
+
+  useEffect(() => {
+    if (mode !== "hours" && mode !== "project") return;
     startTransition(async () => {
       try {
         setError(null);
@@ -85,6 +118,29 @@ export function RequestClosePanel({
   const hasAmount = agreedAmountEur.trim() !== "" && amountNum > 0;
   const hasTime = minutes > 0;
   const canSubmit = hasTime || hasAmount;
+
+  function fillFromRegistration(reg: RequestRegistration) {
+    setMinutes(reg.minutes);
+    setAgreedAmountEur(
+      reg.agreedAmountEur != null ? String(reg.agreedAmountEur) : "",
+    );
+    setNote(reg.note ?? "");
+    setCompletedAt(toDateInput(reg.performedAt));
+    setBillingStatus(
+      reg.billingStatus === "included" ||
+        reg.billingStatus === "billable" ||
+        reg.billingStatus === "non_billable"
+        ? reg.billingStatus
+        : "billable",
+    );
+  }
+
+  function startEdit() {
+    if (!registration?.editable) return;
+    fillFromRegistration(registration);
+    setError(null);
+    setMode("edit");
+  }
 
   function markSoftDone() {
     setError(null);
@@ -149,17 +205,140 @@ export function RequestClosePanel({
     });
   }
 
+  function submitEdit() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        if (!canSubmit) {
+          throw new Error("Indica tempo ou valor acordado (€)");
+        }
+        await updateRequestRegistration({
+          requestId,
+          minutes: hasTime ? minutes : 0,
+          agreedAmountEur: hasAmount ? amountNum : null,
+          note: note || null,
+          billingStatus: billingStatus || null,
+          completedAt,
+        });
+        setMode("idle");
+        onClosed();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro ao guardar");
+      }
+    });
+  }
+
+  function doReopen() {
+    setError(null);
+    startTransition(async () => {
+      try {
+        await reopenRequest(requestId);
+        setMode("idle");
+        onClosed();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Erro ao reabrir");
+      }
+    });
+  }
+
+  if (finalized && mode === "edit") {
+    return (
+      <div className="rounded-lg border border-border px-3 py-3">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="text-xs font-medium">Editar registo</p>
+          <button
+            type="button"
+            className="text-[11px] text-muted"
+            onClick={() => {
+              setMode("idle");
+              setError(null);
+            }}
+          >
+            Cancelar
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {billingFields({
+            completedAt,
+            setCompletedAt,
+            minutes,
+            setMinutes,
+            agreedAmountEur,
+            setAgreedAmountEur,
+            note,
+            setNote,
+            billingStatus,
+            setBillingStatus,
+          })}
+          <Button
+            variant="primary"
+            isDisabled={pending || !canSubmit}
+            onPress={submitEdit}
+          >
+            {pending ? "A guardar…" : "Guardar alterações"}
+          </Button>
+        </div>
+        {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
+      </div>
+    );
+  }
+
   if (finalized) {
     const when = closedAt
       ? new Date(closedAt).toLocaleDateString("pt-PT")
       : "";
+    const summary =
+      closeKind === "hours"
+        ? `Fechado e registado${when ? ` em ${when}` : ""}. Saiu do pipeline.`
+        : closeKind === "project_task" && buildTask
+          ? `Fechado${when ? ` em ${when}` : ""} · «${buildTask.projectTitle}» · «${buildTask.title}». Saiu do pipeline.`
+          : `Fechado${when ? ` em ${when}` : ""}.`;
+
+    const canEdit = Boolean(registration?.editable);
+    const regLabel = registration
+      ? [
+          registration.minutes > 0 ? `${registration.minutes} min` : null,
+          registration.agreedAmountEur != null &&
+          registration.agreedAmountEur > 0
+            ? `${registration.agreedAmountEur} €`
+            : null,
+          INTERVENTION_BILLING_LABELS[registration.billingStatus],
+        ]
+          .filter(Boolean)
+          .join(" · ")
+      : null;
+
     return (
-      <div className="rounded-lg border border-border bg-default/40 px-3 py-2 text-xs text-muted">
-        {closeKind === "hours"
-          ? `Fechado e registado${when ? ` em ${when}` : ""}. Saiu do pipeline.`
-          : closeKind === "project_task" && buildTask
-            ? `Fechado${when ? ` em ${when}` : ""} · «${buildTask.projectTitle}» · «${buildTask.title}». Saiu do pipeline.`
-            : `Fechado${when ? ` em ${when}` : ""}.`}
+      <div className="rounded-lg border border-border bg-default/40 px-3 py-2 text-xs">
+        <p className="text-muted">{summary}</p>
+        {regLabel ? (
+          <p className="mt-1 font-medium text-foreground">{regLabel}</p>
+        ) : null}
+        <div className="mt-2 flex flex-wrap gap-2">
+          {canEdit ? (
+            <Button
+              size="sm"
+              variant="primary"
+              isDisabled={pending}
+              onPress={startEdit}
+            >
+              Editar registo
+            </Button>
+          ) : registration ? (
+            <span className="text-[11px] text-muted">Já faturado — só leitura</span>
+          ) : null}
+          {canEdit || !registration ? (
+            <Button
+              size="sm"
+              variant="secondary"
+              isDisabled={pending}
+              onPress={doReopen}
+            >
+              Reabrir no pipeline
+            </Button>
+          ) : null}
+        </div>
+        {error ? <p className="mt-2 text-danger">{error}</p> : null}
       </div>
     );
   }
@@ -217,7 +396,163 @@ export function RequestClosePanel({
     );
   }
 
-  const billingFields = (
+  return (
+    <div className="rounded-lg border border-border px-3 py-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <p className="text-xs font-medium">
+          {mode === "hours"
+            ? "Fechar · registo no histórico"
+            : "Fechar · projeto + histórico"}
+        </p>
+        <button
+          type="button"
+          className="text-[11px] text-muted"
+          onClick={() => {
+            setMode("idle");
+            setError(null);
+          }}
+        >
+          Cancelar
+        </button>
+      </div>
+
+      {mode === "hours" ? (
+        <div className="flex flex-col gap-2">
+          {billingFields({
+            completedAt,
+            setCompletedAt,
+            minutes,
+            setMinutes,
+            agreedAmountEur,
+            setAgreedAmountEur,
+            note,
+            setNote,
+            billingStatus,
+            setBillingStatus,
+          })}
+          <Button
+            variant="primary"
+            isDisabled={pending || !canSubmit}
+            onPress={submitHours}
+          >
+            {pending ? "A guardar…" : "Fechar, registar e sair da lista"}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {!options ? (
+            <p className="text-xs text-muted">A carregar projetos…</p>
+          ) : options.projects.length === 0 ? (
+            <p className="text-xs text-muted">
+              Este cliente não tem projetos ativos. Cria um projeto primeiro.
+            </p>
+          ) : (
+            <>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="text-muted">Projeto</span>
+                <select
+                  value={projectId}
+                  onChange={(e) => {
+                    setProjectId(e.target.value);
+                    setTaskId("");
+                  }}
+                  className="rounded border border-border bg-[var(--field-background)] px-2 py-1.5 text-sm"
+                >
+                  {options.projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs">
+                <span className="text-muted">Tarefa existente</span>
+                <select
+                  value={taskId}
+                  onChange={(e) => setTaskId(e.target.value)}
+                  className="rounded border border-border bg-[var(--field-background)] px-2 py-1.5 text-sm"
+                >
+                  <option value="">Criar nova tarefa</option>
+                  {tasks.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {!taskId ? (
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="text-muted">Título da nova tarefa</span>
+                  <input
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    className="rounded border border-border bg-[var(--field-background)] px-2 py-1.5 text-sm"
+                  />
+                </label>
+              ) : null}
+              {billingFields({
+                completedAt,
+                setCompletedAt,
+                minutes,
+                setMinutes,
+                agreedAmountEur,
+                setAgreedAmountEur,
+                note,
+                setNote,
+                billingStatus,
+                setBillingStatus,
+              })}
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={markTaskDone}
+                  onChange={(e) => setMarkTaskDone(e.target.checked)}
+                />
+                Marcar tarefa como concluída
+              </label>
+              <Button
+                variant="primary"
+                isDisabled={pending || !canSubmit}
+                onPress={submitProject}
+              >
+                {pending ? "A guardar…" : "Fechar, registar e sair da lista"}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+      {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
+    </div>
+  );
+}
+
+function billingFields({
+  completedAt,
+  setCompletedAt,
+  minutes,
+  setMinutes,
+  agreedAmountEur,
+  setAgreedAmountEur,
+  note,
+  setNote,
+  billingStatus,
+  setBillingStatus,
+}: {
+  completedAt: string;
+  setCompletedAt: (v: string) => void;
+  minutes: number;
+  setMinutes: (v: number) => void;
+  agreedAmountEur: string;
+  setAgreedAmountEur: (v: string) => void;
+  note: string;
+  setNote: (v: string) => void;
+  billingStatus: "" | "included" | "billable" | "non_billable";
+  setBillingStatus: (
+    v: "" | "included" | "billable" | "non_billable",
+  ) => void;
+}) {
+  return (
     <>
       <label className="flex flex-col gap-1 text-xs">
         <span className="text-muted">Data de conclusão</span>
@@ -300,113 +635,5 @@ export function RequestClosePanel({
         <option value="non_billable">Não faturável</option>
       </select>
     </>
-  );
-
-  return (
-    <div className="rounded-lg border border-border px-3 py-3">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <p className="text-xs font-medium">
-          {mode === "hours"
-            ? "Fechar · registo no histórico"
-            : "Fechar · projeto + histórico"}
-        </p>
-        <button
-          type="button"
-          className="text-[11px] text-muted"
-          onClick={() => {
-            setMode("idle");
-            setError(null);
-          }}
-        >
-          Cancelar
-        </button>
-      </div>
-
-      {mode === "hours" ? (
-        <div className="flex flex-col gap-2">
-          {billingFields}
-          <Button
-            variant="primary"
-            isDisabled={pending || !canSubmit}
-            onPress={submitHours}
-          >
-            {pending ? "A guardar…" : "Fechar, registar e sair da lista"}
-          </Button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {!options ? (
-            <p className="text-xs text-muted">A carregar projetos…</p>
-          ) : options.projects.length === 0 ? (
-            <p className="text-xs text-muted">
-              Este cliente não tem projetos ativos. Cria um projeto primeiro.
-            </p>
-          ) : (
-            <>
-              <label className="flex flex-col gap-1 text-xs">
-                <span className="text-muted">Projeto</span>
-                <select
-                  value={projectId}
-                  onChange={(e) => {
-                    setProjectId(e.target.value);
-                    setTaskId("");
-                  }}
-                  className="rounded border border-border bg-[var(--field-background)] px-2 py-1.5 text-sm"
-                >
-                  {options.projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-xs">
-                <span className="text-muted">Tarefa existente</span>
-                <select
-                  value={taskId}
-                  onChange={(e) => setTaskId(e.target.value)}
-                  className="rounded border border-border bg-[var(--field-background)] px-2 py-1.5 text-sm"
-                >
-                  <option value="">Criar nova tarefa</option>
-                  {tasks.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {!taskId ? (
-                <label className="flex flex-col gap-1 text-xs">
-                  <span className="text-muted">Título da nova tarefa</span>
-                  <input
-                    value={newTaskTitle}
-                    onChange={(e) => setNewTaskTitle(e.target.value)}
-                    className="rounded border border-border bg-[var(--field-background)] px-2 py-1.5 text-sm"
-                  />
-                </label>
-              ) : null}
-              {billingFields}
-              <label className="flex items-center gap-2 text-xs">
-                <input
-                  type="checkbox"
-                  checked={markTaskDone}
-                  onChange={(e) => setMarkTaskDone(e.target.checked)}
-                />
-                Marcar tarefa como concluída
-              </label>
-              <Button
-                variant="primary"
-                isDisabled={pending || !canSubmit}
-                onPress={submitProject}
-              >
-                {pending ? "A guardar…" : "Fechar, registar e sair da lista"}
-              </Button>
-            </>
-          )}
-        </div>
-      )}
-
-      {error ? <p className="mt-2 text-xs text-danger">{error}</p> : null}
-    </div>
   );
 }

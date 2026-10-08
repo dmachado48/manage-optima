@@ -9,7 +9,10 @@ import {
   postRequestMessage,
   type RequestThread,
 } from "@/app/actions/messages";
-import { updateRequestStatus } from "@/app/actions/requests";
+import {
+  updateRequestDetails,
+  updateRequestStatus,
+} from "@/app/actions/requests";
 import { RequestClosePanel } from "@/components/pipeline/request-close-panel";
 
 const STATUS_LABEL: Record<RequestThread["status"], string> = {
@@ -52,6 +55,8 @@ export function RequestDetailModal({
   const [body, setBody] = useState("");
   const [files, setFiles] = useState<FileList | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
   const [pending, startTransition] = useTransition();
   const bottomRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -127,6 +132,28 @@ export function RequestDetailModal({
     });
   }
 
+  function beginEditTitle() {
+    if (mode !== "admin" || !thread) return;
+    setTitleDraft(thread.title);
+    setEditingTitle(true);
+  }
+
+  function saveTitle() {
+    if (mode !== "admin") return;
+    const next = titleDraft.trim();
+    if (!next) return;
+    startTransition(async () => {
+      try {
+        await updateRequestDetails({ requestId, title: next });
+        setEditingTitle(false);
+        refresh();
+        onChanged?.();
+      } catch (e) {
+        setSendError(e instanceof Error ? e.message : "Erro ao guardar título");
+      }
+    });
+  }
+
   function format(command: string, value?: string) {
     editorRef.current?.focus();
     document.execCommand(command, false, value);
@@ -154,17 +181,56 @@ export function RequestDetailModal({
         aria-labelledby="request-modal-title"
       >
         <header className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-4 py-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-xs text-muted">
               {thread?.client.name ?? "…"}
               {thread ? ` · ${STATUS_LABEL[thread.status]}` : ""}
             </p>
-            <h2
-              id="request-modal-title"
-              className="truncate text-lg font-medium"
-            >
-              {thread?.title ?? "A carregar…"}
-            </h2>
+            {mode === "admin" && editingTitle ? (
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <input
+                  id="request-modal-title"
+                  value={titleDraft}
+                  onChange={(e) => setTitleDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveTitle();
+                    if (e.key === "Escape") setEditingTitle(false);
+                  }}
+                  className="min-w-0 flex-1 rounded border border-border bg-[var(--field-background)] px-2 py-1 text-lg font-medium"
+                  autoFocus
+                />
+                <Button
+                  size="sm"
+                  variant="primary"
+                  isDisabled={pending || !titleDraft.trim()}
+                  onPress={saveTitle}
+                >
+                  Guardar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => setEditingTitle(false)}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                id="request-modal-title"
+                className={
+                  mode === "admin"
+                    ? "block w-full truncate text-left text-lg font-medium underline-offset-2 hover:underline"
+                    : "block w-full truncate text-left text-lg font-medium"
+                }
+                onClick={mode === "admin" ? beginEditTitle : undefined}
+                disabled={mode !== "admin"}
+                title={mode === "admin" ? "Clica para editar o título" : undefined}
+              >
+                {thread?.title ?? "A carregar…"}
+              </button>
+            )}
           </div>
           <Button variant="ghost" onPress={onClose}>
             Fechar
