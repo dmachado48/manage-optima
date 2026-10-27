@@ -49,128 +49,71 @@ function RequestCard({
   request,
   showClient,
   interactive,
-  onNudge,
   onOpen,
   onDelete,
 }: {
   request: KanbanRequest;
   showClient: boolean;
   interactive: boolean;
-  onNudge: (dir: -1 | 1) => void;
   onOpen: () => void;
   onDelete?: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: request.id,
-    data: { status: request.status },
-    disabled: !interactive,
-  });
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: request.id,
+      data: { status: request.status },
+      disabled: !interactive,
+    });
 
   const style = transform
     ? { transform: CSS.Translate.toString(transform) }
     : undefined;
-  const idx = FLOW.indexOf(request.status);
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className="rounded-lg border border-border bg-surface p-3 shadow-sm"
+      className={
+        interactive
+          ? `min-w-0 cursor-grab touch-none overflow-hidden rounded-lg border border-border bg-surface p-2.5 shadow-sm active:cursor-grabbing ${isDragging ? "opacity-60" : ""}`
+          : "min-w-0 overflow-hidden rounded-lg border border-border bg-surface p-2.5 shadow-sm"
+      }
+      {...(interactive ? { ...listeners, ...attributes } : {})}
     >
-      <div className="flex items-start gap-2">
-        {interactive ? (
-          <button
-            type="button"
-            className="mt-0.5 cursor-grab touch-none rounded px-0.5 text-muted hover:bg-default active:cursor-grabbing"
-            aria-label="Arrastar"
-            {...listeners}
-            {...attributes}
-          >
-            ⋮⋮
-          </button>
-        ) : null}
+      <button
+        type="button"
+        className="block w-full min-w-0 text-left"
+        onClick={onOpen}
+      >
+        <p className="line-clamp-2 break-words text-xs font-medium leading-snug">
+          {request.title}
+        </p>
+        <p className="mt-1 truncate text-[10px] text-muted">
+          {showClient ? `${request.client.name} · ` : ""}
+          {request.source}
+          {request.messageCount ? ` · ${request.messageCount} msg` : ""}
+        </p>
+      </button>
+      <div className="mt-2 flex gap-1">
         <button
           type="button"
-          className="min-w-0 flex-1 text-left"
+          className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={onOpen}
         >
-          <p className="text-sm font-medium leading-snug">{request.title}</p>
-          <p className="mt-1 text-xs text-muted">
-            {showClient ? `${request.client.name} · ` : ""}
-            {request.source}
-            {request.messageCount ? ` · ${request.messageCount} msg` : ""}
-          </p>
+          Abrir
         </button>
+        {onDelete ? (
+          <button
+            type="button"
+            className="rounded border border-border px-1.5 py-0.5 text-[10px] text-red-400 hover:bg-red-500/10"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={onDelete}
+          >
+            Apagar
+          </button>
+        ) : null}
       </div>
-      {interactive ? (
-        <div className="mt-2 flex gap-1 pl-6">
-          <button
-            type="button"
-            className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted disabled:opacity-30"
-            disabled={idx <= 0}
-            onClick={(e) => {
-              e.stopPropagation();
-              onNudge(-1);
-            }}
-            aria-label="Mover para a esquerda"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted disabled:opacity-30"
-            disabled={idx >= FLOW.length - 1}
-            onClick={(e) => {
-              e.stopPropagation();
-              onNudge(1);
-            }}
-            aria-label="Mover para a direita"
-          >
-            →
-          </button>
-          <button
-            type="button"
-            className="ml-auto rounded border border-border px-1.5 py-0.5 text-[10px] text-muted"
-            onClick={onOpen}
-          >
-            Abrir
-          </button>
-          {onDelete ? (
-            <button
-              type="button"
-              className="rounded border border-border px-1.5 py-0.5 text-[10px] text-red-400 hover:bg-red-500/10"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              Apagar
-            </button>
-          ) : null}
-        </div>
-      ) : (
-        <div className="mt-2 flex gap-1">
-          <button
-            type="button"
-            className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted"
-            onClick={onOpen}
-          >
-            Abrir / responder
-          </button>
-          {onDelete ? (
-            <button
-              type="button"
-              className="rounded border border-border px-1.5 py-0.5 text-[10px] text-red-400 hover:bg-red-500/10"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              Apagar
-            </button>
-          ) : null}
-        </div>
-      )}
     </div>
   );
 }
@@ -181,7 +124,6 @@ function Column({
   items,
   showClient,
   interactive,
-  onNudge,
   onOpen,
   onDelete,
 }: {
@@ -190,7 +132,6 @@ function Column({
   items: KanbanRequest[];
   showClient: boolean;
   interactive: boolean;
-  onNudge: (id: string, dir: -1 | 1) => void;
   onOpen: (id: string) => void;
   onDelete?: (id: string) => void;
 }) {
@@ -204,8 +145,8 @@ function Column({
       ref={setNodeRef}
       className={
         isOver
-          ? "flex min-h-48 flex-col rounded-xl bg-accent/15 p-2 ring-2 ring-accent/30"
-          : "flex min-h-48 flex-col rounded-xl bg-default p-2"
+          ? "flex min-h-48 min-w-0 flex-col rounded-xl bg-accent/15 p-2 ring-2 ring-accent/30"
+          : "flex min-h-48 min-w-0 flex-col rounded-xl bg-default p-2"
       }
     >
       <div className="mb-2 flex items-center justify-between px-1">
@@ -214,14 +155,13 @@ function Column({
         </h3>
         <span className="text-xs text-muted">{items.length}</span>
       </div>
-      <ul className="flex flex-1 flex-col gap-2">
+      <ul className="flex min-w-0 flex-1 flex-col gap-2">
         {items.map((r) => (
-          <li key={r.id}>
+          <li key={r.id} className="min-w-0">
             <RequestCard
               request={r}
               showClient={showClient}
               interactive={interactive}
-              onNudge={(dir) => onNudge(r.id, dir)}
               onOpen={() => onOpen(r.id)}
               onDelete={onDelete ? () => onDelete(r.id) : undefined}
             />
@@ -312,13 +252,6 @@ export function ClientWorkBoard({
     });
   }
 
-  function onNudge(id: string, dir: -1 | 1) {
-    const item = requests.find((r) => r.id === id);
-    if (!item) return;
-    const next = FLOW[FLOW.indexOf(item.status) + dir];
-    if (next) moveTo(id, next);
-  }
-
   function onDragStart(event: DragStartEvent) {
     setActiveId(String(event.active.id));
   }
@@ -338,7 +271,7 @@ export function ClientWorkBoard({
   }
 
   const board = (
-    <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
       {COLUMNS.map((col) => (
         <Column
           key={col.key}
@@ -347,7 +280,6 @@ export function ClientWorkBoard({
           items={byStatus[col.key]}
           showClient={false}
           interactive={interactive}
-          onNudge={onNudge}
           onOpen={setOpenRequestId}
           onDelete={interactive ? removeRequest : undefined}
         />
