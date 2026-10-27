@@ -28,23 +28,42 @@
   --pulse-approved: var(--blue-600);
   --pulse-rejected: var(--blue-900);
   --pulse-track: color-mix(in oklab, var(--blue-500) 18%, transparent);
-
-  /* Softer charcoal — easier to read than near-black */
-  --background: oklch(22% 0.008 260);
-  --surface: oklch(28% 0.008 260);
-  --surface-secondary: oklch(32% 0.008 260);
-  --surface-tertiary: oklch(36% 0.008 260);
-  --default: oklch(34% 0.008 260);
-  --field-background: oklch(30% 0.008 260);
-  --border: oklch(42% 0.01 260);
-  --separator: oklch(38% 0.008 260);
-  --muted: oklch(72% 0.012 260);
-  --foreground: oklch(96% 0.005 260);
 }
 
+/*
+ * Beat HeroUI dark defaults (.dark / [data-theme=dark]) with higher specificity.
+ * Mid charcoal — readable, not near-black.
+ */
+html.dark,
+html[data-theme="dark"],
+.dark,
+[data-theme="dark"] {
+  --background: #2b2f36;
+  --background-secondary: #32363e;
+  --background-tertiary: #3a3f48;
+  --surface: #363b44;
+  --surface-secondary: #3e4450;
+  --surface-tertiary: #464d5a;
+  --overlay: #3a404a;
+  --default: #404651;
+  --field-background: #3a404a;
+  --border: #5a6270;
+  --separator: #4a5160;
+  --muted: #a8b0bd;
+  --foreground: #f2f4f7;
+  --surface-foreground: var(--foreground);
+  --default-foreground: var(--foreground);
+  --overlay-foreground: var(--foreground);
+  --field-foreground: var(--foreground);
+}
+
+html,
 body {
   background: var(--background);
   color: var(--foreground);
+}
+
+body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 

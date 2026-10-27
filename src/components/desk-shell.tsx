@@ -49,7 +49,7 @@ export function DeskShell({
   return (
     <DeskChromeProvider value={chrome}>
       <div className="flex min-h-full flex-1 flex-col bg-[var(--background)]">
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-[color-mix(in_oklab,var(--blue-500)_25%,transparent)] bg-[color-mix(in_oklab,var(--blue-950)_70%,var(--surface))] px-3 backdrop-blur sm:px-4">
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-[color-mix(in_oklab,var(--surface)_88%,var(--blue-900))] px-3 backdrop-blur sm:px-4">
           <Link href="/" className="min-w-0 shrink-0">
             <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--blue-300)]">
               Webiton
