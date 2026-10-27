@@ -1,12 +1,15 @@
 import { Suspense } from "react";
 import { BillingAlertsBanner } from "@/components/billing-alerts-banner";
 import { PipelineBoard } from "@/components/pipeline/pipeline-board";
+import { archiveBilledRequests } from "@/lib/archive-requests";
 import { getBillingAlerts } from "@/lib/billing-alerts";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
+  await archiveBilledRequests();
+
   const [clients, requests, billingAlerts] = await Promise.all([
     prisma.client.findMany({
       where: { active: true },
@@ -14,6 +17,7 @@ export default async function HomePage() {
       orderBy: { name: "asc" },
     }),
     prisma.request.findMany({
+      where: { archivedAt: null },
       include: {
         client: { select: { id: true, name: true } },
         _count: { select: { messages: true } },

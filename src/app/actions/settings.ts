@@ -268,12 +268,17 @@ export async function updateAlertSettings(formData: FormData) {
     String(formData.get("alertRegisterMaxMinutes") ?? "90"),
     90,
   );
+  let archiveBilledAfterDays = optionalInt(
+    String(formData.get("archiveBilledAfterDays") ?? "7"),
+    7,
+  );
 
   alertRegisterMinMinutes = Math.min(240, Math.max(15, alertRegisterMinMinutes));
   alertRegisterMaxMinutes = Math.min(
     360,
     Math.max(alertRegisterMinMinutes, alertRegisterMaxMinutes),
   );
+  archiveBilledAfterDays = Math.min(365, Math.max(1, archiveBilledAfterDays));
 
   const data = {
     alertBillableEnabled,
@@ -283,6 +288,7 @@ export async function updateAlertSettings(formData: FormData) {
     alertRegisterSoundEnabled,
     alertRegisterMinMinutes,
     alertRegisterMaxMinutes,
+    archiveBilledAfterDays,
   };
 
   const delegate = (
@@ -307,6 +313,7 @@ export async function updateAlertSettings(formData: FormData) {
         \`alertAttainedEnabled\`, \`alertDeadlineEnabled\`,
         \`alertRegisterSoundEnabled\`,
         \`alertRegisterMinMinutes\`, \`alertRegisterMaxMinutes\`,
+        \`archiveBilledAfterDays\`,
         \`createdAt\`, \`updatedAt\`
       ) VALUES (
         'default',
@@ -314,6 +321,7 @@ export async function updateAlertSettings(formData: FormData) {
         ${alertAttainedEnabled}, ${alertDeadlineEnabled},
         ${alertRegisterSoundEnabled},
         ${alertRegisterMinMinutes}, ${alertRegisterMaxMinutes},
+        ${archiveBilledAfterDays},
         NOW(3), NOW(3)
       )
       ON DUPLICATE KEY UPDATE
@@ -324,6 +332,7 @@ export async function updateAlertSettings(formData: FormData) {
         \`alertRegisterSoundEnabled\` = VALUES(\`alertRegisterSoundEnabled\`),
         \`alertRegisterMinMinutes\` = VALUES(\`alertRegisterMinMinutes\`),
         \`alertRegisterMaxMinutes\` = VALUES(\`alertRegisterMaxMinutes\`),
+        \`archiveBilledAfterDays\` = VALUES(\`archiveBilledAfterDays\`),
         \`updatedAt\` = NOW(3)
     `;
   }

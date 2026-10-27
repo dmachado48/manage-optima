@@ -185,6 +185,8 @@ model Request {
   buildTask      BuildTask?        @relation(fields: [buildTaskId], references: [id], onDelete: SetNull)
   /// Set when finalized with time/€ — leaves the pipeline «Concluído» column.
   closedAt       DateTime?
+  /// Set when billed work is old enough — removed from pipeline entirely.
+  archivedAt     DateTime?
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
@@ -196,6 +198,7 @@ model Request {
   @@index([clientId, status])
   @@index([buildTaskId])
   @@index([status, closedAt])
+  @@index([archivedAt])
 }
 
 model RequestMessage {
@@ -498,6 +501,9 @@ model PlatformConfig {
   /// Idle nudge window in minutes (random between min and max).
   alertRegisterMinMinutes Int   @default(60)
   alertRegisterMaxMinutes Int   @default(90)
+
+  /// After this many days, done requests with no pending billable work are archived out of the pipeline.
+  archiveBilledAfterDays Int @default(7)
 
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt

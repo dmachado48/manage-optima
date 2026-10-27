@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ClientWorkBoard } from "@/components/clients/work-board";
+import { archiveBilledRequests } from "@/lib/archive-requests";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +15,10 @@ export default async function ClientTrabalhosPage({
   const client = await prisma.client.findUnique({ where: { id } });
   if (!client) notFound();
 
+  await archiveBilledRequests();
+
   const requests = await prisma.request.findMany({
-    where: { clientId: id },
+    where: { clientId: id, archivedAt: null },
     include: {
       client: { select: { id: true, name: true } },
       _count: { select: { messages: true } },

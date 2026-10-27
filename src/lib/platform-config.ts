@@ -26,6 +26,8 @@ export type PlatformConfigData = {
   alertRegisterSoundEnabled: boolean;
   alertRegisterMinMinutes: number;
   alertRegisterMaxMinutes: number;
+  /** Days after billing before done requests leave the pipeline. */
+  archiveBilledAfterDays: number;
 };
 
 export const DEFAULT_PLATFORM_CONFIG: PlatformConfigData = {
@@ -55,6 +57,7 @@ export const DEFAULT_PLATFORM_CONFIG: PlatformConfigData = {
   alertRegisterSoundEnabled: true,
   alertRegisterMinMinutes: 60,
   alertRegisterMaxMinutes: 90,
+  archiveBilledAfterDays: 7,
 };
 
 type PlatformConfigRow = {
@@ -83,6 +86,7 @@ type PlatformConfigRow = {
   alertRegisterSoundEnabled?: boolean | number | null;
   alertRegisterMinMinutes?: number | null;
   alertRegisterMaxMinutes?: number | null;
+  archiveBilledAfterDays?: number | null;
 };
 
 function toBool(v: boolean | number | undefined): boolean {
@@ -166,6 +170,10 @@ function mapRow(row: PlatformConfigRow): PlatformConfigData {
       row.alertRegisterMaxMinutes != null
         ? Number(row.alertRegisterMaxMinutes)
         : DEFAULT_PLATFORM_CONFIG.alertRegisterMaxMinutes,
+    archiveBilledAfterDays:
+      row.archiveBilledAfterDays != null
+        ? Math.min(365, Math.max(1, Number(row.archiveBilledAfterDays)))
+        : DEFAULT_PLATFORM_CONFIG.archiveBilledAfterDays,
   };
 }
 

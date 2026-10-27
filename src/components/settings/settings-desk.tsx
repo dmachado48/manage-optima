@@ -1605,6 +1605,24 @@ export function SettingsDesk({
                   </span>
                 </span>
               </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="font-medium">
+                  Arquivar faturados no pipeline (dias)
+                </span>
+                <span className="text-xs text-muted">
+                  Pedidos concluídos sem nada por faturar saem do pipeline após
+                  estes dias desde a faturação.
+                </span>
+                <input
+                  type="number"
+                  name="archiveBilledAfterDays"
+                  min={1}
+                  max={365}
+                  step={1}
+                  defaultValue={platformConfig.archiveBilledAfterDays}
+                  className="mt-1 w-24 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm"
+                />
+              </label>
               <div className="flex items-center gap-3">
                 <Button type="submit" variant="primary" isDisabled={pending}>
                   Guardar alertas

@@ -308,6 +308,10 @@ export async function billSelectedInterventions(input: {
   revalidateInterventionPaths(client.id);
   revalidatePath("/maintenance");
   revalidatePath("/settings");
+  revalidatePath("/");
+  // Lazy archive of older billed done requests (config: archiveBilledAfterDays).
+  const { archiveBilledRequests } = await import("@/lib/archive-requests");
+  await archiveBilledRequests();
   return {
     reportId: report.id,
     batchCode: report.batchCode ?? report.id,
