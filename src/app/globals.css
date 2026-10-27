@@ -2,9 +2,8 @@
 @import "@heroui/styles";
 
 @theme inline {
-  /* Desk UI uses Geist Mono as the primary typeface */
-  --font-sans: var(--font-geist-mono);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-desk);
+  --font-mono: var(--font-desk);
 }
 
 /* Optima blue scale — used across desk UI */
@@ -65,7 +64,7 @@ body {
 }
 
 body {
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-family: var(--font-desk), "IBM Plex Sans", system-ui, sans-serif;
 }
 
 /* Largura das páginas do desk — full bleed dentro da área de conteúdo */
@@ -83,10 +82,10 @@ body {
 
 button,
 .button {
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-family: var(--font-desk), "IBM Plex Sans", system-ui, sans-serif;
   font-size: 0.6875rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   line-height: 1;
   text-transform: uppercase;
 }
@@ -122,7 +121,7 @@ a.tech-btn {
   align-items: center;
   justify-content: center;
   height: 1.75rem;
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-family: var(--font-desk), "IBM Plex Sans", system-ui, sans-serif;
   font-size: 0.6875rem;
   font-weight: 500;
   letter-spacing: 0.06em;
