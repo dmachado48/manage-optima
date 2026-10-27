@@ -28,6 +28,18 @@
   --pulse-approved: var(--blue-600);
   --pulse-rejected: var(--blue-900);
   --pulse-track: color-mix(in oklab, var(--blue-500) 18%, transparent);
+
+  /* Softer charcoal — easier to read than near-black */
+  --background: oklch(22% 0.008 260);
+  --surface: oklch(28% 0.008 260);
+  --surface-secondary: oklch(32% 0.008 260);
+  --surface-tertiary: oklch(36% 0.008 260);
+  --default: oklch(34% 0.008 260);
+  --field-background: oklch(30% 0.008 260);
+  --border: oklch(42% 0.01 260);
+  --separator: oklch(38% 0.008 260);
+  --muted: oklch(72% 0.012 260);
+  --foreground: oklch(96% 0.005 260);
 }
 
 body {

@@ -37,7 +37,7 @@ export function assembleDailyJobs(input: {
         source: "request",
         requestId: r.id,
         clientId: r.clientId,
-        href: `/pipeline?client=${r.clientId}`,
+        href: `/?client=${r.clientId}`,
       });
     }
   }

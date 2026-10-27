@@ -75,6 +75,26 @@ export async function updateBuildTaskHours(formData: FormData) {
   revalidateProject(task.projectId);
 }
 
+export async function deleteBuildTask(taskId: string) {
+  await requireAdmin();
+  const task = await prisma.buildTask.findUnique({
+    where: { id: taskId },
+    select: { id: true, projectId: true, title: true },
+  });
+  if (!task) throw new Error("Tarefa não encontrada");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.request.updateMany({
+      where: { buildTaskId: task.id },
+      data: { buildTaskId: null },
+    });
+    await tx.buildTask.delete({ where: { id: task.id } });
+  });
+
+  revalidateProject(task.projectId);
+  return { ok: true as const };
+}
+
 export async function updateProjectDetails(formData: FormData) {
   await requireAdmin();
   const projectId = String(formData.get("projectId") ?? "");

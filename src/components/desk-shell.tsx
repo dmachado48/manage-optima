@@ -10,8 +10,7 @@ import { IdleNudge, type IdleNudgeSettings } from "@/components/idle-nudge";
 import { QuickLogModal } from "@/components/quick-log-modal";
 
 const MODULES = [
-  { href: "/", label: "Hoje", short: "Hoje" },
-  { href: "/pipeline", label: "Pipeline", short: "Pipe." },
+  { href: "/", label: "Pipeline", short: "Pipe." },
   { href: "/inbox", label: "Inbox", short: "Inbox" },
   { href: "/clients", label: "Clientes", short: "Clientes" },
   { href: "/finance", label: "Financeiro", short: "Fin." },

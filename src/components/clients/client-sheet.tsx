@@ -1121,7 +1121,7 @@ export function ClientSheet({
               Pipeline do cliente
             </Link>
             <Link
-              href={`/pipeline?client=${client.id}`}
+              href={`/?client=${client.id}`}
               className="tech-btn border border-border hover:bg-default"
             >
               Ver no Pipeline geral

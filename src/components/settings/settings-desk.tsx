@@ -1535,6 +1535,22 @@ export function SettingsDesk({
                   </span>
                 </span>
               </label>
+              <div className="ml-7">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onPress={async () => {
+                    const { playRegisterChime, primeAlertAudio } = await import(
+                      "@/lib/alert-sound"
+                    );
+                    await primeAlertAudio();
+                    await playRegisterChime();
+                  }}
+                >
+                  Testar som
+                </Button>
+              </div>
               <div className="ml-7 flex flex-wrap gap-3">
                 <label className="flex flex-col gap-1 text-xs">
                   <span className="text-muted">Mín. minutos</span>

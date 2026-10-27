@@ -114,7 +114,7 @@ export function DailyDesk({
             <Button variant="secondary" onPress={() => setResumeOpen(true)}>
               Resumo do dia
             </Button>
-            <Link href="/pipeline" className="tech-btn border border-border">
+            <Link href="/" className="tech-btn border border-border">
               Pipeline
             </Link>
           </div>
@@ -144,7 +144,7 @@ export function DailyDesk({
           {jobs.length === 0 ? (
             <p className="text-sm text-muted">
               Nada na lista. Adiciona um item manual ou trabalha o{" "}
-              <Link href="/pipeline" className="underline">
+              <Link href="/" className="underline">
                 Pipeline
               </Link>
               .

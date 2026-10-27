@@ -10,6 +10,7 @@ import {
   type RequestThread,
 } from "@/app/actions/messages";
 import {
+  deleteRequest,
   updateRequestDetails,
   updateRequestStatus,
 } from "@/app/actions/requests";
@@ -154,6 +155,26 @@ export function RequestDetailModal({
     });
   }
 
+  function removeRequest() {
+    if (mode !== "admin" || !thread) return;
+    if (
+      !window.confirm(
+        `Apagar o pedido «${thread.title}»? Esta ação não se pode desfazer.`,
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await deleteRequest(requestId);
+        onChanged?.();
+        onClose();
+      } catch (e) {
+        setSendError(e instanceof Error ? e.message : "Erro ao apagar");
+      }
+    });
+  }
+
   function format(command: string, value?: string) {
     editorRef.current?.focus();
     document.execCommand(command, false, value);
@@ -294,6 +315,19 @@ export function RequestDetailModal({
                     onChanged?.();
                   }}
                 />
+              ) : null}
+
+              {mode === "admin" ? (
+                <div className="rounded-lg border border-border px-3 py-2">
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={removeRequest}
+                    className="text-xs text-red-400 underline-offset-2 hover:underline disabled:opacity-50"
+                  >
+                    Apagar pedido
+                  </button>
+                </div>
               ) : null}
 
               {thread.looseAttachments.length > 0 ? (

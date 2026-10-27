@@ -15,7 +15,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { updateRequestStatus } from "@/app/actions/requests";
+import { deleteRequest, updateRequestStatus } from "@/app/actions/requests";
 import { NewRequestPanel } from "@/components/maintenance/new-request-panel";
 import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 
@@ -51,12 +51,14 @@ function RequestCard({
   interactive,
   onNudge,
   onOpen,
+  onDelete,
 }: {
   request: PipelineRequest;
   showClient: boolean;
   interactive: boolean;
   onNudge: (dir: -1 | 1) => void;
   onOpen: () => void;
+  onDelete?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: request.id,
@@ -132,9 +134,21 @@ function RequestCard({
           >
             Abrir
           </button>
+          {onDelete ? (
+            <button
+              type="button"
+              className="rounded border border-border px-1.5 py-0.5 text-[10px] text-red-400 hover:bg-red-500/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              Apagar
+            </button>
+          ) : null}
         </div>
       ) : (
-        <div className="mt-2">
+        <div className="mt-2 flex gap-1">
           <button
             type="button"
             className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted"
@@ -142,6 +156,18 @@ function RequestCard({
           >
             Abrir
           </button>
+          {onDelete ? (
+            <button
+              type="button"
+              className="rounded border border-border px-1.5 py-0.5 text-[10px] text-red-400 hover:bg-red-500/10"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              Apagar
+            </button>
+          ) : null}
         </div>
       )}
     </div>
@@ -156,6 +182,7 @@ function Column({
   interactive,
   onNudge,
   onOpen,
+  onDelete,
 }: {
   status: PipelineRequest["status"];
   label: string;
@@ -164,6 +191,7 @@ function Column({
   interactive: boolean;
   onNudge: (id: string, dir: -1 | 1) => void;
   onOpen: (id: string) => void;
+  onDelete?: (id: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -194,6 +222,7 @@ function Column({
               interactive={interactive}
               onNudge={(dir) => onNudge(r.id, dir)}
               onOpen={() => onOpen(r.id)}
+              onDelete={onDelete ? () => onDelete(r.id) : undefined}
             />
           </li>
         ))}
@@ -252,7 +281,27 @@ export function PipelineBoard({
     if (value === "all") params.delete("client");
     else params.set("client", value);
     const q = params.toString();
-    router.push(q ? `/pipeline?${q}` : "/pipeline");
+    router.push(q ? `/?${q}` : "/");
+  }
+
+  function removeRequest(id: string) {
+    const item = requests.find((r) => r.id === id);
+    if (
+      !window.confirm(
+        `Apagar o pedido «${item?.title ?? id}»? Esta ação não se pode desfazer.`,
+      )
+    ) {
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await deleteRequest(id);
+        if (openRequestId === id) setOpenRequestId(null);
+        router.refresh();
+      } catch (e) {
+        window.alert(e instanceof Error ? e.message : "Erro ao apagar");
+      }
+    });
   }
 
   function moveTo(id: string, status: PipelineRequest["status"]) {
@@ -342,6 +391,7 @@ export function PipelineBoard({
                 interactive
                 onNudge={onNudge}
                 onOpen={setOpenRequestId}
+                onDelete={removeRequest}
               />
             ))}
           </div>

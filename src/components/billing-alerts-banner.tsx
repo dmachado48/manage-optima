@@ -23,8 +23,8 @@ export function BillingAlertsBanner({
   if (alerts.length === 0) return null;
 
   return (
-    <section className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-      <h2 className="mb-2 text-sm font-medium text-amber-950">
+    <section className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+      <h2 className="mb-2 text-sm font-medium text-amber-100">
         Alertas ({alerts.length})
       </h2>
       <ul className="flex flex-col gap-2">
@@ -33,14 +33,14 @@ export function BillingAlertsBanner({
           return (
             <li
               key={a.id}
-              className="flex flex-wrap items-center justify-between gap-2 text-sm text-amber-950"
+              className="flex flex-wrap items-center justify-between gap-2 text-sm text-amber-50"
             >
               <div>
-                <span className="mr-1.5 rounded-sm bg-amber-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-950">
+                <span className="mr-1.5 rounded-sm bg-amber-500/25 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-100">
                   {CATEGORY_LABEL[a.category]}
                 </span>
                 <span className="font-medium">{a.label}</span>
-                <span className="text-amber-900/80">
+                <span className="text-amber-100/75">
                   {" "}
                   · {a.clientName} · {a.detail}
                 </span>
@@ -48,7 +48,7 @@ export function BillingAlertsBanner({
               <div className="flex gap-1">
                 <Link
                   href={a.href}
-                  className="rounded-md border border-amber-300 bg-white/70 px-2 py-1 text-xs hover:bg-white"
+                  className="rounded-md border border-amber-500/40 bg-surface/60 px-2 py-1 text-xs hover:bg-surface"
                 >
                   Abrir
                 </Link>
@@ -57,7 +57,7 @@ export function BillingAlertsBanner({
                     type="button"
                     disabled={pending}
                     onClick={() => onMarkProject(entityId)}
-                    className="rounded-md border border-amber-300 bg-white/70 px-2 py-1 text-xs hover:bg-white disabled:opacity-50"
+                    className="rounded-md border border-amber-500/40 bg-surface/60 px-2 py-1 text-xs hover:bg-surface disabled:opacity-50"
                   >
                     Marcar faturado
                   </button>
@@ -67,7 +67,7 @@ export function BillingAlertsBanner({
                     type="button"
                     disabled={pending}
                     onClick={() => onMarkContract(entityId)}
-                    className="rounded-md border border-amber-300 bg-white/70 px-2 py-1 text-xs hover:bg-white disabled:opacity-50"
+                    className="rounded-md border border-amber-500/40 bg-surface/60 px-2 py-1 text-xs hover:bg-surface disabled:opacity-50"
                   >
                     Marcar faturado
                   </button>

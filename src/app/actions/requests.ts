@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 function revalidateRequest(clientId: string, projectId?: string | null) {
   revalidatePath("/maintenance");
   revalidatePath("/pipeline");
+  revalidatePath("/");
   revalidatePath("/finance");
   revalidatePath("/clients");
   revalidatePath(`/clients/${clientId}`);
@@ -569,5 +570,68 @@ export async function updateRequestDetails(input: {
   });
 
   revalidateRequest(updated.clientId);
+  return { ok: true as const };
+}
+
+/**
+ * Delete a pipeline request. Blocked if any intervention was already billed.
+ * Reverses pack/avença hours for included interventions.
+ */
+export async function deleteRequest(requestId: string) {
+  await requireAdmin();
+  const request = await prisma.request.findUnique({
+    where: { id: requestId },
+    select: {
+      id: true,
+      clientId: true,
+      title: true,
+      interventions: {
+        select: {
+          id: true,
+          minutes: true,
+          billingStatus: true,
+        },
+      },
+    },
+  });
+  if (!request) throw new Error("Pedido não encontrado");
+
+  if (request.interventions.some((i) => i.billingStatus === "billed")) {
+    throw new Error(
+      "Não podes apagar um pedido com intervenções já faturadas.",
+    );
+  }
+
+  const includedMinutes = request.interventions
+    .filter((i) => i.billingStatus === "included" && i.minutes > 0)
+    .reduce((s, i) => s + i.minutes, 0);
+
+  await prisma.$transaction(async (tx) => {
+    if (includedMinutes > 0) {
+      const active = await tx.contract.findFirst({
+        where: { clientId: request.clientId, active: true },
+      });
+      if (active && shouldDeduct(active.type)) {
+        await tx.contract.update({
+          where: { id: active.id },
+          data: {
+            hoursUsed: Math.max(
+              0,
+              Number(active.hoursUsed) - hoursFromMinutes(includedMinutes),
+            ),
+          },
+        });
+      }
+    }
+
+    await tx.inboundEmail.updateMany({
+      where: { requestId: request.id },
+      data: { requestId: null },
+    });
+
+    await tx.request.delete({ where: { id: request.id } });
+  });
+
+  revalidateRequest(request.clientId);
   return { ok: true as const };
 }

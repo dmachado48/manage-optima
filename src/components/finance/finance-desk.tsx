@@ -4,6 +4,7 @@ import { Button } from "@heroui/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
+import { sendMonthlyFinanceReportEmail } from "@/app/actions/finance";
 import {
   billSelectedInterventions,
   setInterventionBillingStatusForm,
@@ -77,6 +78,7 @@ export function FinanceDesk({
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [openRequestId, setOpenRequestId] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const [reportPreview, setReportPreview] = useState<{
     batchCode: string;
     body: string;
@@ -185,7 +187,7 @@ export function FinanceDesk({
             Controlo do que está por faturar e do já faturado
           </p>
         </div>
-        <div className="flex flex-wrap gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <div className="rounded-lg border border-border bg-surface px-3 py-2">
             <p className="text-[11px] text-muted">Registos</p>
             <p className="font-semibold tabular-nums">{totals.count}</p>
@@ -200,8 +202,30 @@ export function FinanceDesk({
             <p className="text-[11px] text-muted">Valor estimado</p>
             <p className="font-semibold tabular-nums">{eur(totals.amount)}</p>
           </div>
+          <Button
+            variant="secondary"
+            isDisabled={pending}
+            onPress={() => {
+              setEmailStatus(null);
+              startTransition(async () => {
+                try {
+                  const res = await sendMonthlyFinanceReportEmail();
+                  setEmailStatus(`Enviado para ${res.to}`);
+                } catch (e) {
+                  setEmailStatus(
+                    e instanceof Error ? e.message : "Erro ao enviar",
+                  );
+                }
+              });
+            }}
+          >
+            Email relatório do mês
+          </Button>
         </div>
       </header>
+      {emailStatus ? (
+        <p className="text-xs text-muted">{emailStatus}</p>
+      ) : null}
 
       <div className="flex flex-wrap items-end gap-2">
         <div className="flex gap-1 rounded-lg bg-default p-0.5 text-xs">

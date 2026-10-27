@@ -2,6 +2,7 @@
 
 import { Button, Card } from "@heroui/react";
 import { useEffect, useRef, useState } from "react";
+import { playRegisterChime, primeAlertAudio } from "@/lib/alert-sound";
 
 export type IdleNudgeSettings = {
   enabled: boolean;
@@ -16,41 +17,6 @@ function nextDelayMs(minMinutes: number, maxMinutes: number) {
   return min + Math.random() * (max - min);
 }
 
-/** Soft attention chime — only used for the register nudge. */
-function playRegisterChime() {
-  try {
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const now = ctx.currentTime;
-
-    function tone(freq: number, start: number, dur: number, gain = 0.045) {
-      const osc = ctx.createOscillator();
-      const g = ctx.createGain();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      g.gain.setValueAtTime(0.0001, now + start);
-      g.gain.exponentialRampToValueAtTime(gain, now + start + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + start + dur);
-      osc.connect(g);
-      g.connect(ctx.destination);
-      osc.start(now + start);
-      osc.stop(now + start + dur + 0.02);
-    }
-
-    tone(660, 0, 0.18);
-    tone(880, 0.16, 0.22);
-    window.setTimeout(() => {
-      void ctx.close();
-    }, 600);
-  } catch {
-    // Autoplay / unsupported — ignore
-  }
-}
-
 export function IdleNudge({
   onLog,
   settings,
@@ -61,6 +27,19 @@ export function IdleNudge({
   const [visible, setVisible] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const soundedForShow = useRef(false);
+
+  // Unlock audio after the first user gesture (required by browsers).
+  useEffect(() => {
+    function unlock() {
+      void primeAlertAudio();
+    }
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, []);
 
   useEffect(() => {
     if (!settings.enabled) {
@@ -102,7 +81,7 @@ export function IdleNudge({
     }
     if (soundedForShow.current) return;
     soundedForShow.current = true;
-    if (settings.soundEnabled) playRegisterChime();
+    if (settings.soundEnabled) void playRegisterChime();
   }, [visible, settings.soundEnabled]);
 
   if (!settings.enabled || !visible) return null;

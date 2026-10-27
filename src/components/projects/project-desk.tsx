@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   createBuildTask,
+  deleteBuildTask,
   markProjectBilledFromProjects,
   markProjectDelivered,
   setProjectStatusFromProjects,
@@ -283,9 +284,30 @@ export function ProjectDesk({
                         key={t.id}
                         className="rounded-md border border-border bg-surface p-2"
                       >
-                        <p className="text-sm font-medium leading-snug">
-                          {t.title}
-                        </p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium leading-snug">
+                            {t.title}
+                          </p>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            className="shrink-0 text-[10px] text-red-400 hover:underline disabled:opacity-50"
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  `Apagar a tarefa «${t.title}»?`,
+                                )
+                              ) {
+                                return;
+                              }
+                              run(async () => {
+                                await deleteBuildTask(t.id);
+                              });
+                            }}
+                          >
+                            Apagar
+                          </button>
+                        </div>
                         <form
                           className="mt-1"
                           action={(fd) => {
