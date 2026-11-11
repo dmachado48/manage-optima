@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@heroui/react";
 import { logoutAction } from "@/app/actions/auth";
 import { DeskChromeProvider } from "@/components/desk-chrome-context";
@@ -39,12 +39,39 @@ export function DeskShell({
   idleNudge: IdleNudgeSettings;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [logOpen, setLogOpen] = useState(false);
+  const [logMode, setLogMode] = useState<"form" | "voice">("form");
   const chrome = useMemo(
-    () => ({ openQuickLog: () => setLogOpen(true) }),
+    () => ({
+      openQuickLog: () => {
+        setLogMode("form");
+        setLogOpen(true);
+      },
+    }),
     [],
   );
   const settingsActive = pathname === "/settings" || pathname.startsWith("/settings/");
+
+  useEffect(() => {
+    const voice = searchParams.get("voice");
+    const log = searchParams.get("log");
+    if (voice === "1" || log === "1") {
+      setLogMode(voice === "1" ? "voice" : "form");
+      setLogOpen(true);
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("voice");
+      params.delete("log");
+      const q = params.toString();
+      router.replace(q ? `${pathname}?${q}` : pathname);
+    }
+  }, [searchParams, pathname, router]);
+
+  function openLog(mode: "form" | "voice" = "form") {
+    setLogMode(mode);
+    setLogOpen(true);
+  }
 
   return (
     <DeskChromeProvider value={chrome}>
@@ -61,18 +88,25 @@ export function DeskShell({
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <Button
+              variant="secondary"
+              onPress={() => openLog("voice")}
+              className="hidden sm:inline-flex"
+            >
+              Voz
+            </Button>
+            <Button
               variant="primary"
-              onPress={() => setLogOpen(true)}
+              onPress={() => openLog("form")}
               className="hidden sm:inline-flex"
             >
               Registar horas
             </Button>
             <Button
               variant="primary"
-              onPress={() => setLogOpen(true)}
+              onPress={() => openLog("voice")}
               className="sm:hidden"
             >
-              Registar
+              Voz
             </Button>
             <Link
               href="/maintenance"
@@ -163,21 +197,23 @@ export function DeskShell({
           })}
           <button
             type="button"
-            onClick={() => setLogOpen(true)}
+            onClick={() => openLog("voice")}
             className="rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-white"
           >
-            Log
+            Voz
           </button>
         </nav>
       </div>
 
       <QuickLogModal
+        key={logMode}
         clients={clients}
         openRequests={openRequests}
         open={logOpen}
         onOpenChange={setLogOpen}
+        initialMode={logMode}
       />
-      <IdleNudge onLog={() => setLogOpen(true)} settings={idleNudge} />
+      <IdleNudge onLog={() => openLog("form")} settings={idleNudge} />
     </DeskChromeProvider>
   );
 }

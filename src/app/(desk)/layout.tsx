@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { DeskShell } from "@/components/desk-shell";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { prisma } from "@/lib/prisma";
@@ -24,17 +25,19 @@ export default async function DeskLayout({
   ]);
 
   return (
-    <DeskShell
-      clients={clients}
-      openRequests={openRequests}
-      idleNudge={{
-        enabled: platform.alertRegisterEnabled,
-        soundEnabled: platform.alertRegisterSoundEnabled,
-        minMinutes: platform.alertRegisterMinMinutes,
-        maxMinutes: platform.alertRegisterMaxMinutes,
-      }}
-    >
-      {children}
-    </DeskShell>
+    <Suspense fallback={<div className="min-h-full flex-1 bg-[var(--background)]" />}>
+      <DeskShell
+        clients={clients}
+        openRequests={openRequests}
+        idleNudge={{
+          enabled: platform.alertRegisterEnabled,
+          soundEnabled: platform.alertRegisterSoundEnabled,
+          minMinutes: platform.alertRegisterMinMinutes,
+          maxMinutes: platform.alertRegisterMaxMinutes,
+        }}
+      >
+        {children}
+      </DeskShell>
+    </Suspense>
   );
 }
