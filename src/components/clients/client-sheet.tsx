@@ -14,6 +14,7 @@ import {
   setInterventionBillingStatusForm,
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
+import { MultiSelect } from "@/components/multi-select";
 import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 import {
   CONTRACT_TYPE_LABELS,
@@ -81,15 +82,12 @@ const STATUS_COLOR: Record<ClientRequestRow["status"], string> = {
 
 const TYPE_LABEL = CONTRACT_TYPE_LABELS;
 
-const BILLING_FILTERS = [
+const BILLING_OPTIONS = [
   ["billable", "Por faturar"],
   ["billed", "Faturadas"],
   ["included", "Pack"],
   ["non_billable", "Não faturável"],
-  ["all", "Todas"],
 ] as const;
-
-type BillingFilter = (typeof BILLING_FILTERS)[number][0];
 
 const SOURCE_LABEL: Record<string, string> = {
   email: "Email",
@@ -389,7 +387,7 @@ export function ClientSheet({
   );
   const [packHours, setPackHours] = useState(10);
   const [openRequestId, setOpenRequestId] = useState<string | null>(null);
-  const [billingFilter, setBillingFilter] = useState<BillingFilter>("billable");
+  const [billingStatuses, setBillingStatuses] = useState<string[]>(["billable"]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] =
     useState<keyof typeof INTERVENTION_BILLING_LABELS>("billed");
@@ -431,11 +429,11 @@ export function ClientSheet({
   );
 
   const listedInterventions = useMemo(() => {
-    if (billingFilter === "all") return filteredInterventions;
-    return filteredInterventions.filter(
-      (i) => i.billingStatus === billingFilter,
+    if (billingStatuses.length === 0) return filteredInterventions;
+    return filteredInterventions.filter((i) =>
+      billingStatuses.includes(i.billingStatus),
     );
-  }, [filteredInterventions, billingFilter]);
+  }, [filteredInterventions, billingStatuses]);
 
   const listedMinutes = useMemo(
     () => listedInterventions.reduce((s, i) => s + i.minutes, 0),
@@ -443,8 +441,7 @@ export function ClientSheet({
   );
 
   const billingCounts = useMemo(() => {
-    const counts: Record<BillingFilter, number> = {
-      all: filteredInterventions.length,
+    const counts: Record<(typeof BILLING_OPTIONS)[number][0], number> = {
       billable: 0,
       billed: 0,
       included: 0,
@@ -469,7 +466,7 @@ export function ClientSheet({
   useEffect(() => {
     setSelectedIds([]);
     setBulkError(null);
-  }, [dateFrom, dateTo, billingFilter]);
+  }, [dateFrom, dateTo, billingStatuses]);
 
   const periodStatusCounts = useMemo((): StatusCount[] => {
     const pool = periodActive
@@ -638,7 +635,7 @@ export function ClientSheet({
   }
 
   return (
-    <div className="desk-page flex flex-1 flex-col gap-4 py-6 lg:flex-row lg:items-start lg:gap-6">
+    <div className="desk-page flex flex-1 flex-col gap-4 py-6 xl:flex-row xl:items-start xl:gap-6">
       {/* Main: pedidos + histórico first; analysis secondary */}
       <main className="min-w-0 flex-1 space-y-5">
         <div>
@@ -702,90 +699,103 @@ export function ClientSheet({
           </div>
         </div>
 
-        <section className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-3">
-          <div>
-            <label className="mb-1 block text-xs text-muted">De</label>
-            <input
-              type="date"
-              value={dateFrom}
-              max={dateTo || undefined}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="rounded-lg border border-border px-2.5 py-1.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs text-muted">Até</label>
-            <input
-              type="date"
-              value={dateTo}
-              min={dateFrom || undefined}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="rounded-lg border border-border px-2.5 py-1.5 text-sm"
-            />
-          </div>
-          <div className="flex flex-wrap gap-1.5 pb-0.5">
-            <button
-              type="button"
-              className="rounded-md border border-border px-2 py-1.5 text-xs hover:bg-default"
-              onClick={() => {
-                const range = currentMonthRange();
-                setDateFrom(range.from);
-                setDateTo(range.to);
-              }}
-            >
-              Este mês
-            </button>
-            <button
-              type="button"
-              className="rounded-md border border-border px-2 py-1.5 text-xs hover:bg-default"
-              onClick={() => {
-                const now = new Date();
-                const start = new Date(
-                  Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1),
-                );
-                setDateFrom(start.toISOString().slice(0, 10));
-                setDateTo(now.toISOString().slice(0, 10));
-              }}
-            >
-              Últimos 3 meses
-            </button>
-            {periodActive ? (
+        <section
+          aria-label="Filtros do histórico"
+          className="space-y-3 rounded-xl border border-border bg-surface p-3"
+        >
+          <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+            <div>
+              <label
+                htmlFor="client-date-from"
+                className="mb-1 block text-xs text-muted"
+              >
+                De
+              </label>
+              <input
+                id="client-date-from"
+                type="date"
+                value={dateFrom}
+                max={dateTo || undefined}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="h-9 w-40 rounded-lg border border-border px-2.5 text-sm"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="client-date-to"
+                className="mb-1 block text-xs text-muted"
+              >
+                Até
+              </label>
+              <input
+                id="client-date-to"
+                type="date"
+                value={dateTo}
+                min={dateFrom || undefined}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="h-9 w-40 rounded-lg border border-border px-2.5 text-sm"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               <button
                 type="button"
-                className="rounded-md border border-border px-2 py-1.5 text-xs text-muted hover:bg-default"
+                className="h-9 rounded-md border border-border px-2.5 text-xs hover:bg-default"
                 onClick={() => {
-                  setDateFrom("");
-                  setDateTo("");
+                  const range = currentMonthRange();
+                  setDateFrom(range.from);
+                  setDateTo(range.to);
                 }}
               >
-                Todo o histórico
+                Este mês
               </button>
-            ) : null}
-          </div>
-          <div className="flex flex-wrap gap-1 rounded-lg bg-default p-0.5 text-xs">
-            {BILLING_FILTERS.map(([key, label]) => (
               <button
-                key={key}
                 type="button"
-                onClick={() => setBillingFilter(key)}
-                className={
-                  billingFilter === key
-                    ? "rounded-sm bg-foreground/10 px-2 py-1 font-medium text-foreground"
-                    : "rounded-sm px-2 py-1 text-muted hover:text-foreground"
-                }
+                className="h-9 rounded-md border border-border px-2.5 text-xs hover:bg-default"
+                onClick={() => {
+                  const now = new Date();
+                  const start = new Date(
+                    Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 2, 1),
+                  );
+                  setDateFrom(start.toISOString().slice(0, 10));
+                  setDateTo(now.toISOString().slice(0, 10));
+                }}
               >
-                {label} ({billingCounts[key]})
+                Últimos 3 meses
               </button>
-            ))}
+              {periodActive ? (
+                <button
+                  type="button"
+                  className="h-9 rounded-md border border-border px-2.5 text-xs text-muted hover:bg-default"
+                  onClick={() => {
+                    setDateFrom("");
+                    setDateTo("");
+                  }}
+                >
+                  Todo o histórico
+                </button>
+              ) : null}
+            </div>
           </div>
-          <p className="ml-auto text-xs text-muted">
-            {listedInterventions.length} interv.
-            {billingFilter !== "all"
-              ? ` · ${INTERVENTION_BILLING_LABELS[billingFilter].toLowerCase()}`
-              : ""}
-            {" · "}
-            {formatMinutes(listedMinutes)}
-          </p>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border pt-3">
+            <MultiSelect
+              label="Estado"
+              emptyLabel="Todos os estados"
+              options={BILLING_OPTIONS.map(([value, label]) => ({
+                value,
+                label,
+                count: billingCounts[value],
+              }))}
+              selected={billingStatuses}
+              onChange={setBillingStatuses}
+            />
+            <p
+              aria-live="polite"
+              className="whitespace-nowrap text-xs tabular-nums text-muted"
+            >
+              {listedInterventions.length} interv. ·{" "}
+              {formatMinutes(listedMinutes)}
+            </p>
+          </div>
         </section>
 
         {/* Pedidos + histórico — primary */}
@@ -841,9 +851,6 @@ export function ClientSheet({
             <h2 className="text-sm font-medium">
               Histórico de intervenções
               {periodActive ? " no período" : ""}
-              {billingFilter !== "all"
-                ? ` · ${INTERVENTION_BILLING_LABELS[billingFilter].toLowerCase()}`
-                : ""}
             </h2>
             <div className="flex items-center gap-3">
               {listedInterventions.length > 0 ? (
@@ -915,12 +922,12 @@ export function ClientSheet({
           ) : null}
           {listedInterventions.length === 0 ? (
             <p className="px-4 py-4 text-sm text-muted">
-              {billingFilter === "billable"
+              {billingStatuses.length === 1 && billingStatuses[0] === "billable"
                 ? periodActive
                   ? "Sem intervenções por faturar neste período."
                   : "Sem intervenções por faturar."
                 : periodActive
-                  ? "Sem intervenções neste período."
+                  ? "Sem intervenções neste filtro."
                   : "Sem intervenções registadas."}
             </p>
           ) : (
@@ -1085,7 +1092,7 @@ export function ClientSheet({
       </main>
 
       {/* Right sidebar: secondary info */}
-      <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-4 lg:w-80">
+      <aside className="w-full shrink-0 space-y-4 xl:sticky xl:top-4 xl:w-80">
         <section className="rounded-xl border border-border bg-surface p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 className="text-xs font-medium uppercase tracking-wide text-muted">

@@ -11,6 +11,7 @@ import {
   setInterventionBillingStatusForm,
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
+import { MultiSelect } from "@/components/multi-select";
 import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 import {
   INTERVENTION_BILLING_LABELS,
@@ -34,8 +35,6 @@ export type FinanceIntervention = {
 };
 
 type ClientOption = { id: string; name: string };
-
-type StatusFilter = "billable" | "billed" | "all";
 
 function eur(n: number) {
   return new Intl.NumberFormat("pt-PT", {
@@ -72,8 +71,8 @@ export function FinanceDesk({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const initial = useMemo(() => currentMonthRange(), []);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("billable");
-  const [clientId, setClientId] = useState("");
+  const [billingStatuses, setBillingStatuses] = useState<string[]>(["billable"]);
+  const [clientIds, setClientIds] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState(initial.from);
   const [dateTo, setDateTo] = useState(initial.to);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -90,13 +89,13 @@ export function FinanceDesk({
 
   const filtered = useMemo(() => {
     return interventions.filter((i) => {
-      if (statusFilter === "billable" && i.billingStatus !== "billable") {
+      if (
+        billingStatuses.length > 0 &&
+        !billingStatuses.includes(i.billingStatus)
+      ) {
         return false;
       }
-      if (statusFilter === "billed" && i.billingStatus !== "billed") {
-        return false;
-      }
-      if (clientId && i.client.id !== clientId) return false;
+      if (clientIds.length > 0 && !clientIds.includes(i.client.id)) return false;
       if (dateFrom) {
         if (new Date(i.performedAt) < new Date(`${dateFrom}T00:00:00`)) {
           return false;
@@ -109,7 +108,7 @@ export function FinanceDesk({
       }
       return true;
     });
-  }, [interventions, statusFilter, clientId, dateFrom, dateTo]);
+  }, [interventions, billingStatuses, clientIds, dateFrom, dateTo]);
 
   const totals = useMemo(() => {
     const minutes = filtered.reduce((s, i) => s + i.minutes, 0);
@@ -228,50 +227,30 @@ export function FinanceDesk({
         <p className="text-xs text-muted">{emailStatus}</p>
       ) : null}
 
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex gap-1 rounded-lg bg-default p-0.5 text-xs">
-          {(
-            [
-              ["billable", "Por faturar"],
-              ["billed", "Faturado"],
-              ["all", "Tudo"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => {
-                setStatusFilter(key);
-                setSelectedIds([]);
-              }}
-              className={
-                statusFilter === key
-                  ? "rounded-sm bg-foreground/10 px-2.5 py-1.5 font-medium"
-                  : "rounded-sm px-2.5 py-1.5 text-muted hover:text-foreground"
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <label className="flex flex-col gap-1 text-xs text-muted">
-          Cliente
-          <select
-            value={clientId}
-            onChange={(e) => {
-              setClientId(e.target.value);
-              setSelectedIds([]);
-            }}
-            className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-foreground"
-          >
-            <option value="">Todos</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+        <MultiSelect
+          label="Estado"
+          emptyLabel="Todos os estados"
+          options={[
+            { value: "billable", label: "Por faturar" },
+            { value: "billed", label: "Faturado" },
+          ]}
+          selected={billingStatuses}
+          onChange={(next) => {
+            setBillingStatuses(next);
+            setSelectedIds([]);
+          }}
+        />
+        <MultiSelect
+          label="Cliente"
+          emptyLabel="Todos os clientes"
+          options={clients.map((c) => ({ value: c.id, label: c.name }))}
+          selected={clientIds}
+          onChange={(next) => {
+            setClientIds(next);
+            setSelectedIds([]);
+          }}
+        />
         <label className="flex flex-col gap-1 text-xs text-muted">
           De
           <input
@@ -281,7 +260,7 @@ export function FinanceDesk({
               setDateFrom(e.target.value);
               setSelectedIds([]);
             }}
-            className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-foreground"
+            className="h-9 w-40 rounded-lg border border-border bg-surface px-2.5 text-sm text-foreground"
           />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted">
@@ -293,12 +272,12 @@ export function FinanceDesk({
               setDateTo(e.target.value);
               setSelectedIds([]);
             }}
-            className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-foreground"
+            className="h-9 w-40 rounded-lg border border-border bg-surface px-2.5 text-sm text-foreground"
           />
         </label>
         <button
           type="button"
-          className="rounded-md border border-border px-2 py-1.5 text-xs hover:bg-default"
+          className="h-9 rounded-md border border-border px-2.5 text-xs hover:bg-default"
           onClick={() => {
             const range = currentMonthRange();
             setDateFrom(range.from);
@@ -310,7 +289,7 @@ export function FinanceDesk({
         </button>
         <button
           type="button"
-          className="rounded-md border border-border px-2 py-1.5 text-xs text-muted hover:bg-default"
+          className="h-9 rounded-md border border-border px-2.5 text-xs text-muted hover:bg-default"
           onClick={() => {
             setDateFrom("");
             setDateTo("");

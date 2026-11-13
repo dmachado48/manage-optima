@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { deleteRequest, updateRequestStatus } from "@/app/actions/requests";
 import { NewRequestPanel } from "@/components/maintenance/new-request-panel";
+import { MultiSelect } from "@/components/multi-select";
 import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 
 export type PipelineRequest = {
@@ -205,7 +206,10 @@ export function PipelineBoard({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const clientFilter = searchParams.get("client") ?? "all";
+  const clientIds = (searchParams.get("client") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id && id !== "all");
   const [showClosed, setShowClosed] = useState(false);
   const [mobilePanel, setMobilePanel] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -218,12 +222,12 @@ export function PipelineBoard({
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {
-      if (clientFilter !== "all" && r.client.id !== clientFilter) return false;
+      if (clientIds.length > 0 && !clientIds.includes(r.client.id)) return false;
       // Finalized requests leave «Concluído» unless explicitly shown.
       if (r.status === "done" && r.closedAt && !showClosed) return false;
       return true;
     });
-  }, [requests, clientFilter, showClosed]);
+  }, [requests, clientIds, showClosed]);
 
   const byStatus = useMemo(() => {
     const map: Record<PipelineRequest["status"], PipelineRequest[]> = {
@@ -240,10 +244,10 @@ export function PipelineBoard({
     ? (requests.find((r) => r.id === activeId) ?? null)
     : null;
 
-  function setClientFilter(value: string) {
+  function setClientIds(ids: string[]) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value === "all") params.delete("client");
-    else params.set("client", value);
+    if (ids.length === 0) params.delete("client");
+    else params.set("client", ids.join(","));
     const q = params.toString();
     router.push(q ? `/?${q}` : "/");
   }
@@ -299,21 +303,13 @@ export function PipelineBoard({
     <div className="flex min-h-0 flex-1">
       <div className="flex min-w-0 flex-1 flex-col gap-3 py-4">
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-sm">
-            <span className="text-muted">Cliente</span>
-            <select
-              value={clientFilter}
-              onChange={(e) => setClientFilter(e.target.value)}
-              className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
-            >
-              <option value="all">Todos</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <MultiSelect
+            label="Cliente"
+            emptyLabel="Todos"
+            options={clients.map((c) => ({ value: c.id, label: c.name }))}
+            selected={clientIds}
+            onChange={setClientIds}
+          />
           <label className="flex items-center gap-2 text-xs text-muted">
             <input
               type="checkbox"
@@ -344,7 +340,7 @@ export function PipelineBoard({
                 status={col.key}
                 label={col.label}
                 items={byStatus[col.key]}
-                showClient={clientFilter === "all"}
+                showClient={clientIds.length !== 1}
                 interactive
                 onOpen={setOpenRequestId}
                 onDelete={removeRequest}
@@ -364,7 +360,7 @@ export function PipelineBoard({
 
       <NewRequestPanel
         clients={clients}
-        defaultClientId={clientFilter !== "all" ? clientFilter : undefined}
+        defaultClientId={clientIds.length === 1 ? clientIds[0] : undefined}
         mobileOpen={mobilePanel}
         onMobileOpenChange={setMobilePanel}
       />

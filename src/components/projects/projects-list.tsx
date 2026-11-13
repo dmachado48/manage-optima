@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 import { createProject } from "@/app/actions/commercial";
+import { MultiSelect } from "@/components/multi-select";
 import { formatDatePt, formatMinutes } from "@/lib/dates";
 import type { ProjectFinance } from "@/lib/project-finance";
 
@@ -33,8 +34,6 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "Cancelado",
 };
 
-type Filter = "active" | "delivered" | "all";
-
 function eur(n: number) {
   return new Intl.NumberFormat("pt-PT", {
     style: "currency",
@@ -53,7 +52,8 @@ export function ProjectsList({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<Filter>("active");
+  const [statuses, setStatuses] = useState<string[]>(["active"]);
+  const [clientIds, setClientIds] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showProject, setShowProject] = useState(false);
@@ -75,8 +75,9 @@ export function ProjectsList({
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return projects.filter((p) => {
-      if (filter === "active" && p.status === "delivered") return false;
-      if (filter === "delivered" && p.status !== "delivered") return false;
+      const bucket = p.status === "delivered" ? "delivered" : "active";
+      if (statuses.length > 0 && !statuses.includes(bucket)) return false;
+      if (clientIds.length > 0 && !clientIds.includes(p.client.id)) return false;
       if (!inDateRange(p.createdAt)) return false;
       if (!q) return true;
       return (
@@ -85,7 +86,7 @@ export function ProjectsList({
         (STATUS_LABELS[p.status] ?? p.status).toLowerCase().includes(q)
       );
     });
-  }, [projects, query, filter, dateFrom, dateTo]);
+  }, [projects, query, statuses, clientIds, dateFrom, dateTo]);
 
   const activeCount = projects.filter((p) => p.status !== "delivered").length;
   const deliveredCount = projects.filter((p) => p.status === "delivered").length;
@@ -111,34 +112,29 @@ export function ProjectsList({
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1 rounded-lg bg-default p-0.5 text-xs">
-          {(
-            [
-              ["active", `Ativos (${activeCount})`],
-              ["delivered", `Entregues (${deliveredCount})`],
-              ["all", `Todos (${projects.length})`],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setFilter(key)}
-              className={
-                filter === key
-                  ? "rounded-sm bg-foreground/10 px-2.5 py-1.5 font-medium"
-                  : "rounded-sm px-2.5 py-1.5 text-muted hover:text-foreground"
-              }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <MultiSelect
+          label="Estado"
+          emptyLabel="Todos"
+          options={[
+            { value: "active", label: "Em curso", count: activeCount },
+            { value: "delivered", label: "Entregues", count: deliveredCount },
+          ]}
+          selected={statuses}
+          onChange={setStatuses}
+        />
+        <MultiSelect
+          label="Cliente"
+          emptyLabel="Todos"
+          options={clients.map((c) => ({ value: c.id, label: c.name }))}
+          selected={clientIds}
+          onChange={setClientIds}
+        />
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Pesquisar projeto ou cliente…"
-          className="min-w-[14rem] flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+          className="h-9 min-w-[14rem] flex-1 rounded-lg border border-border bg-surface px-3 text-sm"
         />
         <label className="flex items-center gap-1 text-xs text-muted">
           De
@@ -146,7 +142,7 @@ export function ProjectsList({
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
           />
         </label>
         <label className="flex items-center gap-1 text-xs text-muted">
@@ -155,7 +151,7 @@ export function ProjectsList({
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
           />
         </label>
       </div>

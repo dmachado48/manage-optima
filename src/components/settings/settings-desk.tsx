@@ -18,6 +18,7 @@ import {
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
 import { markContractBilled } from "@/app/actions/commercial";
+import { MultiSelect } from "@/components/multi-select";
 import { PlatformPanels } from "@/components/settings/platform-panels";
 import {
   INTERVENTION_BILLING_LABELS,
@@ -118,13 +119,11 @@ export function SettingsDesk({
   const [tab, setTab] = useState<Tab>(initialTab);
   const [showContract, setShowContract] = useState(false);
   const [editContract, setEditContract] = useState<ContractRow | null>(null);
-  const [billingFilter, setBillingFilter] = useState<
-    "all" | "billable" | "billed" | "included" | "non_billable"
-  >("billable");
+  const [billingStatuses, setBillingStatuses] = useState<string[]>(["billable"]);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [query, setQuery] = useState("");
-  const [clientId, setClientId] = useState("");
+  const [clientIds, setClientIds] = useState<string[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkStatus, setBulkStatus] =
     useState<InterventionBillingStatus>("billed");
@@ -292,8 +291,11 @@ export function SettingsDesk({
   const filteredInterventions = useMemo(() => {
     const q = query.trim().toLowerCase();
     return interventions.filter((i) => {
-      if (clientId && i.client.id !== clientId) return false;
-      if (billingFilter !== "all" && i.billingStatus !== billingFilter) {
+      if (clientIds.length > 0 && !clientIds.includes(i.client.id)) return false;
+      if (
+        billingStatuses.length > 0 &&
+        !billingStatuses.includes(i.billingStatus)
+      ) {
         return false;
       }
       if (dateFrom) {
@@ -313,7 +315,7 @@ export function SettingsDesk({
         (i.note?.toLowerCase().includes(q) ?? false)
       );
     });
-  }, [interventions, billingFilter, dateFrom, dateTo, query, clientId]);
+  }, [interventions, billingStatuses, dateFrom, dateTo, query, clientIds]);
 
   const selectedVisible = useMemo(
     () => filteredInterventions.filter((i) => selectedIds.includes(i.id)),
@@ -380,14 +382,14 @@ export function SettingsDesk({
   const filteredContracts = useMemo(() => {
     const q = query.trim().toLowerCase();
     return contracts.filter((c) => {
-      if (clientId && c.client.id !== clientId) return false;
+      if (clientIds.length > 0 && !clientIds.includes(c.client.id)) return false;
       if (!q) return true;
       return (
         c.client.name.toLowerCase().includes(q) ||
         TYPE_LABEL[c.type].toLowerCase().includes(q)
       );
     });
-  }, [contracts, query, clientId]);
+  }, [contracts, query, clientIds]);
 
   return (
     <main className="desk-page flex flex-1 flex-col gap-4 py-8">
@@ -431,25 +433,19 @@ export function SettingsDesk({
         </div>
         {tab === "contracts" || tab === "interventions" ? (
           <>
-            <select
-              value={clientId}
-              onChange={(e) => setClientId(e.target.value)}
-              className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
-              aria-label="Filtrar por cliente"
-            >
-              <option value="">Todos os clientes</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <MultiSelect
+              label="Cliente"
+              emptyLabel="Todos os clientes"
+              options={clients.map((c) => ({ value: c.id, label: c.name }))}
+              selected={clientIds}
+              onChange={setClientIds}
+            />
             <input
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Pesquisar…"
-              className="min-w-[12rem] flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+              className="h-9 min-w-[12rem] flex-1 rounded-lg border border-border bg-surface px-3 text-sm"
             />
           </>
         ) : null}
@@ -478,11 +474,11 @@ export function SettingsDesk({
                     className="px-3 py-8 text-center text-sm text-muted"
                   >
                     <p className="mb-3">
-                      {clientId || query
+                      {clientIds.length > 0 || query
                         ? "Nenhum pack/contrato com estes filtros."
                         : "Ainda não há packs nem contratos."}
                     </p>
-                    {!clientId && !query ? (
+                    {clientIds.length === 0 && !query ? (
                       <Button
                         variant="primary"
                         onPress={() => setShowContract(true)}
@@ -1052,34 +1048,22 @@ export function SettingsDesk({
 
       {tab === "interventions" ? (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex flex-wrap gap-1 rounded-lg bg-default p-0.5 text-xs">
-              {(
-                [
-                  ["billable", "Por faturar"],
-                  ["billed", "Faturadas"],
-                  ["included", "Pack"],
-                  ["non_billable", "Não faturável"],
-                  ["all", "Todas"],
-                ] as const
-              ).map(([key, label]) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setBillingFilter(key);
-                    setSelectedIds([]);
-                  }}
-                  className={
-                    billingFilter === key
-                      ? "rounded-sm bg-foreground/10 px-2.5 py-1.5 font-medium"
-                      : "rounded-sm px-2.5 py-1.5 text-muted hover:text-foreground"
-                  }
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <MultiSelect
+              label="Estado"
+              emptyLabel="Todos os estados"
+              options={[
+                ["billable", "Por faturar"],
+                ["billed", "Faturadas"],
+                ["included", "Pack"],
+                ["non_billable", "Não faturável"],
+              ].map(([value, label]) => ({ value, label }))}
+              selected={billingStatuses}
+              onChange={(next) => {
+                setBillingStatuses(next);
+                setSelectedIds([]);
+              }}
+            />
             <label className="flex items-center gap-1 text-xs text-muted">
               De
               <input
@@ -1089,7 +1073,7 @@ export function SettingsDesk({
                   setDateFrom(e.target.value);
                   setSelectedIds([]);
                 }}
-                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+                className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
               />
             </label>
             <label className="flex items-center gap-1 text-xs text-muted">
@@ -1101,7 +1085,7 @@ export function SettingsDesk({
                   setDateTo(e.target.value);
                   setSelectedIds([]);
                 }}
-                className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+                className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
               />
             </label>
           </div>
@@ -1706,7 +1690,7 @@ export function SettingsDesk({
         <ContractModal
           clients={clients}
           editing={editContract}
-          defaultClientId={clientId || undefined}
+          defaultClientId={clientIds.length === 1 ? clientIds[0] : undefined}
           defaultBillingRateEur={platformConfig.defaultBillingRateEur}
           pending={pending}
           onClose={() => {

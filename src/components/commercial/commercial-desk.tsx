@@ -16,6 +16,7 @@ import {
   updateProposalDraft,
 } from "@/app/actions/commercial";
 import { BillingAlertsBanner } from "@/components/billing-alerts-banner";
+import { MultiSelect } from "@/components/multi-select";
 import { formatDatePt } from "@/lib/dates";
 import type { BillingAlert } from "@/lib/billing";
 import {
@@ -178,6 +179,8 @@ export function CommercialDesk({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [query, setQuery] = useState("");
+  const [proposalStatuses, setProposalStatuses] = useState<string[]>([]);
+  const [projectStatuses, setProjectStatuses] = useState<string[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<{
     kind: "proposal" | "project";
     id: string;
@@ -233,6 +236,12 @@ export function CommercialDesk({
   const filteredProposals = useMemo(() => {
     const q = query.trim().toLowerCase();
     return proposals.filter((p) => {
+      if (
+        proposalStatuses.length > 0 &&
+        !proposalStatuses.includes(p.status)
+      ) {
+        return false;
+      }
       if (!inDateRange(p.proposalDate || p.createdAt)) return false;
       if (!q) return true;
       return (
@@ -244,11 +253,14 @@ export function CommercialDesk({
           .includes(q)
       );
     });
-  }, [proposals, query, dateFrom, dateTo]);
+  }, [proposals, query, proposalStatuses, dateFrom, dateTo]);
 
   const filteredProjects = useMemo(() => {
     const q = query.trim().toLowerCase();
     return projects.filter((p) => {
+      if (projectStatuses.length > 0 && !projectStatuses.includes(p.status)) {
+        return false;
+      }
       if (!inDateRange(p.createdAt)) return false;
       if (!q) return true;
       return (
@@ -257,7 +269,7 @@ export function CommercialDesk({
         (PROJECT_STATUS_LABELS[p.status] ?? p.status).toLowerCase().includes(q)
       );
     });
-  }, [projects, query, dateFrom, dateTo]);
+  }, [projects, query, projectStatuses, dateFrom, dateTo]);
 
   return (
     <main className="desk-page flex flex-1 flex-col gap-4 py-8">
@@ -317,12 +329,41 @@ export function CommercialDesk({
             </button>
           ))}
         </div>
+        {tab === "proposals" ? (
+          <MultiSelect
+            label="Estado"
+            emptyLabel="Todos os estados"
+            options={Object.entries(PROPOSAL_STATUS_LABELS).map(
+              ([value, label]) => ({
+                value,
+                label,
+                count: proposals.filter((p) => p.status === value).length,
+              }),
+            )}
+            selected={proposalStatuses}
+            onChange={setProposalStatuses}
+          />
+        ) : (
+          <MultiSelect
+            label="Estado"
+            emptyLabel="Todos os estados"
+            options={Object.entries(PROJECT_STATUS_LABELS).map(
+              ([value, label]) => ({
+                value,
+                label,
+                count: projects.filter((p) => p.status === value).length,
+              }),
+            )}
+            selected={projectStatuses}
+            onChange={setProjectStatuses}
+          />
+        )}
         <input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Pesquisar…"
-          className="min-w-[12rem] flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+          className="h-9 min-w-[12rem] flex-1 rounded-lg border border-border bg-surface px-3 text-sm"
         />
         <label className="flex items-center gap-1 text-xs text-muted">
           De
@@ -330,7 +371,7 @@ export function CommercialDesk({
             type="date"
             value={dateFrom}
             onChange={(e) => setDateFrom(e.target.value)}
-            className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
           />
         </label>
         <label className="flex items-center gap-1 text-xs text-muted">
@@ -339,7 +380,7 @@ export function CommercialDesk({
             type="date"
             value={dateTo}
             onChange={(e) => setDateTo(e.target.value)}
-            className="rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-foreground"
+            className="h-9 rounded-lg border border-border bg-surface px-2 text-sm text-foreground"
           />
         </label>
       </div>

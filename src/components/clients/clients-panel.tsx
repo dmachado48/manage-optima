@@ -11,6 +11,8 @@ import {
   setClientActive,
 } from "@/app/actions/clients";
 import { CONTRACT_TYPE_LABELS, remainingHours, isPackAtLimit } from "@/lib/billing";
+import { formatMinutes } from "@/lib/dates";
+import { MultiSelect } from "@/components/multi-select";
 import {
   CLIENT_RELATION_LABELS,
   CLIENT_RELATION_OPTIONS,
@@ -33,6 +35,13 @@ type ClientRow = {
     requestsDone: number;
     projects: number;
   };
+  toBill: {
+    interventions: number;
+    minutes: number;
+    amountEur: number;
+    projects: number;
+    packDue: boolean;
+  };
   contracts: {
     id: string;
     type: "retainer" | "pack" | "hourly";
@@ -43,8 +52,22 @@ type ClientRow = {
   }[];
 };
 
-type StatusFilter = "active" | "inactive" | "all";
-type SortKey = "open" | "name" | "interventions";
+type SortKey = "open" | "name" | "interventions" | "toBill";
+
+function hasToBill(client: ClientRow) {
+  return (
+    client.toBill.interventions > 0 ||
+    client.toBill.projects > 0 ||
+    client.toBill.packDue
+  );
+}
+
+function eur(n: number) {
+  return new Intl.NumberFormat("pt-PT", {
+    style: "currency",
+    currency: "EUR",
+  }).format(n);
+}
 type SortDir = "asc" | "desc";
 
 export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
@@ -52,7 +75,8 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
   const [modal, setModal] = useState<"client" | "contract" | null>(null);
   const [pending, startTransition] = useTransition();
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<StatusFilter>("active");
+  const [statuses, setStatuses] = useState<string[]>(["active"]);
+  const [onlyToBill, setOnlyToBill] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("open");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [confirmDelete, setConfirmDelete] = useState<ClientRow | null>(null);
@@ -61,8 +85,13 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const rows = clients.filter((c) => {
-      if (status === "active" && !c.active) return false;
-      if (status === "inactive" && c.active) return false;
+      if (
+        statuses.length > 0 &&
+        !statuses.includes(c.active ? "active" : "inactive")
+      ) {
+        return false;
+      }
+      if (onlyToBill && !hasToBill(c)) return false;
       if (!q) return true;
       return (
         c.name.toLowerCase().includes(q) ||
@@ -85,10 +114,17 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
         if (d !== 0) return d;
         return a.name.localeCompare(b.name, "pt");
       }
+      if (sortKey === "toBill") {
+        const d = (a.toBill.amountEur - b.toBill.amountEur) * dir;
+        if (d !== 0) return d;
+        const minutes = (a.toBill.minutes - b.toBill.minutes) * dir;
+        if (minutes !== 0) return minutes;
+        return a.name.localeCompare(b.name, "pt");
+      }
       return a.name.localeCompare(b.name, "pt") * dir;
     });
     return rows;
-  }, [clients, query, status, sortKey, sortDir]);
+  }, [clients, query, statuses, onlyToBill, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -110,6 +146,18 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
 
   const activeCount = clients.filter((c) => c.active).length;
   const inactiveCount = clients.length - activeCount;
+  const statusScoped = clients.filter((c) => {
+    if (statuses.length === 0) return true;
+    return statuses.includes(c.active ? "active" : "inactive");
+  });
+  const toBillClients = statusScoped.filter(hasToBill);
+  const toBillInterventions = toBillClients.reduce(
+    (sum, c) => sum + c.toBill.interventions,
+    0,
+  );
+  const toBillMinutes = toBillClients.reduce((sum, c) => sum + c.toBill.minutes, 0);
+  const toBillProjects = toBillClients.reduce((sum, c) => sum + c.toBill.projects, 0);
+  const toBillAmount = toBillClients.reduce((sum, c) => sum + c.toBill.amountEur, 0);
 
   function run(action: () => Promise<void>) {
     startTransition(async () => {
@@ -126,6 +174,28 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
           <p className="text-sm text-muted">
             {activeCount} ativos
             {inactiveCount > 0 ? ` · ${inactiveCount} desativados` : ""}
+          </p>
+          <p className="mt-1 text-sm">
+            {toBillClients.length === 0 ? (
+              <span className="text-muted">Nada por faturar neste estado.</span>
+            ) : (
+              <>
+                <span className="font-medium">
+                  {toBillAmount > 0 ? `${eur(toBillAmount)} por faturar` : "Por faturar"}
+                </span>
+                <span className="text-muted">
+                  {" "}
+                  · {toBillClients.length}{" "}
+                  {toBillClients.length === 1 ? "cliente" : "clientes"}
+                  {toBillInterventions > 0
+                    ? ` · ${toBillInterventions} interv. · ${formatMinutes(toBillMinutes)}`
+                    : ""}
+                  {toBillProjects > 0
+                    ? ` · ${toBillProjects} ${toBillProjects === 1 ? "projeto" : "projetos"}`
+                    : ""}
+                </span>
+              </>
+            )}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -146,28 +216,36 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
           placeholder="Pesquisar nome, contacto, domínio…"
           className="min-w-[16rem] flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
         />
-        <div className="flex gap-1 rounded-lg bg-default p-0.5 text-xs">
-          {(
-            [
-              ["active", `Ativos (${activeCount})`],
-              ["inactive", `Desativados (${inactiveCount})`],
-              ["all", `Todos (${clients.length})`],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setStatus(key)}
-              className={
-                status === key
-                  ? "rounded-sm bg-foreground/10 px-2.5 py-1.5 font-medium text-foreground"
-                  : "rounded-sm px-2.5 py-1.5 text-muted hover:text-foreground"
+        <MultiSelect
+          label="Estado"
+          emptyLabel="Todos"
+          options={[
+            { value: "active", label: "Ativos", count: activeCount },
+            { value: "inactive", label: "Desativados", count: inactiveCount },
+          ]}
+          selected={statuses}
+          onChange={setStatuses}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            setOnlyToBill((on) => {
+              const next = !on;
+              if (next) {
+                setSortKey("toBill");
+                setSortDir("desc");
               }
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+              return next;
+            });
+          }}
+          className={
+            onlyToBill
+              ? "rounded-lg bg-amber-500/15 px-2.5 py-1.5 text-xs font-medium text-amber-900"
+              : "rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted hover:text-foreground"
+          }
+        >
+          Por faturar ({toBillClients.length})
+        </button>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
@@ -208,6 +286,17 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
                   {sortIndicator("interventions")}
                 </button>
               </th>
+              <th className="px-3 py-2 font-medium text-right">
+                <button
+                  type="button"
+                  onClick={() => toggleSort("toBill")}
+                  className="inline-flex items-center justify-end text-amber-800 hover:text-amber-950"
+                  title="Ordenar pelo valor por faturar"
+                >
+                  Por faturar
+                  {sortIndicator("toBill")}
+                </button>
+              </th>
               <th className="px-3 py-2 font-medium">Contrato</th>
               <th className="px-3 py-2 font-medium">Horas</th>
               <th className="px-3 py-2 font-medium text-right">Ações</th>
@@ -217,10 +306,12 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
             {filtered.length === 0 ? (
               <tr>
                 <td
-                  colSpan={7}
+                  colSpan={8}
                   className="px-3 py-8 text-center text-sm text-muted"
                 >
-                  Nenhum cliente neste filtro.
+                  {onlyToBill
+                    ? "Nenhum cliente com trabalho por faturar."
+                    : "Nenhum cliente neste filtro."}
                 </td>
               </tr>
             ) : (
@@ -283,6 +374,39 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-muted">
                       {c.counts.interventions}
+                    </td>
+                    <td className="px-3 py-2.5 text-right">
+                      {hasToBill(c) ? (
+                        <Link
+                          href={`/clients/${c.id}`}
+                          className="inline-flex flex-col items-end gap-0.5 rounded-md bg-amber-500/15 px-2 py-1 text-amber-950 hover:bg-amber-500/25"
+                        >
+                          {c.toBill.amountEur > 0 ? (
+                            <span className="text-sm font-medium tabular-nums">
+                              {eur(c.toBill.amountEur)}
+                            </span>
+                          ) : null}
+                          {c.toBill.interventions > 0 ? (
+                            <span className="text-[11px] tabular-nums">
+                              {c.toBill.interventions} interv. ·{" "}
+                              {formatMinutes(c.toBill.minutes)}
+                            </span>
+                          ) : null}
+                          {c.toBill.projects > 0 ? (
+                            <span className="text-[11px]">
+                              {c.toBill.projects}{" "}
+                              {c.toBill.projects === 1 ? "projeto" : "projetos"}
+                            </span>
+                          ) : null}
+                          {c.toBill.packDue && c.toBill.interventions === 0 ? (
+                            <span className="text-[10px] font-medium uppercase tracking-wide">
+                              Pack esgotado
+                            </span>
+                          ) : null}
+                        </Link>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
                     </td>
                     <td className="px-3 py-2.5 text-muted">
                       {activeContract
