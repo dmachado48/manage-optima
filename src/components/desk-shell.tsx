@@ -76,12 +76,12 @@ export function DeskShell({
   return (
     <DeskChromeProvider value={chrome}>
       <div className="flex min-h-full flex-1 flex-col bg-[var(--background)]">
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-[color-mix(in_oklab,var(--surface)_88%,var(--blue-900))] px-3 backdrop-blur sm:px-4">
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-3 backdrop-blur sm:px-4">
           <Link href="/" className="min-w-0 shrink-0">
-            <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--blue-300)]">
+            <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--blue-700)]">
               Webiton
             </p>
-            <p className="truncate text-sm font-semibold tracking-tight text-[var(--blue-100)]">
+            <p className="truncate text-sm font-semibold tracking-tight text-[var(--blue-950)]">
               Optima Desk
             </p>
           </Link>
@@ -154,8 +154,8 @@ export function DeskShell({
                     href={m.href}
                     className={
                       active
-                        ? "rounded-lg bg-[color-mix(in_oklab,var(--blue-600)_28%,transparent)] px-3 py-2 text-sm font-medium text-[var(--blue-100)]"
-                        : "rounded-lg px-3 py-2 text-sm text-muted hover:bg-[color-mix(in_oklab,var(--blue-900)_40%,transparent)] hover:text-[var(--blue-200)]"
+                        ? "rounded-lg bg-[color-mix(in_oklab,var(--blue-600)_14%,transparent)] px-3 py-2 text-sm font-medium text-[var(--blue-900)]"
+                        : "rounded-lg px-3 py-2 text-sm text-muted hover:bg-[color-mix(in_oklab,var(--blue-600)_10%,transparent)] hover:text-[var(--blue-800)]"
                     }
                   >
                     {m.label}

@@ -252,7 +252,7 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
                       <span
                         className={
                           c.relation === "partner"
-                            ? "ml-2 rounded bg-[color-mix(in_oklab,var(--blue-600)_22%,transparent)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--blue-200)]"
+                            ? "ml-2 rounded bg-[color-mix(in_oklab,var(--blue-600)_22%,transparent)] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-[var(--blue-800)]"
                             : "ml-2 rounded bg-foreground/8 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted"
                         }
                       >

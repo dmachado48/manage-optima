@@ -24,37 +24,38 @@
   --accent: var(--blue-600);
   --accent-soft: color-mix(in oklab, var(--blue-500) 22%, transparent);
   --accent-muted: color-mix(in oklab, var(--blue-400) 35%, transparent);
-  --pulse-pipeline: var(--blue-400);
+  --pulse-pipeline: var(--blue-600);
   --pulse-approved: var(--blue-600);
   --pulse-rejected: var(--blue-900);
   --pulse-track: color-mix(in oklab, var(--blue-500) 18%, transparent);
 }
 
 /*
- * Beat HeroUI dark defaults (.dark / [data-theme=dark]) with higher specificity.
- * Mid charcoal — readable, not near-black.
+ * Light desk. Unlayered so these beat HeroUI defaults and stay readable:
+ * near-white surfaces, dark ink, borders strong enough to scan.
  */
-html.dark,
-html[data-theme="dark"],
-.dark,
-[data-theme="dark"] {
-  --background: #2b2f36;
-  --background-secondary: #32363e;
-  --background-tertiary: #3a3f48;
-  --surface: #363b44;
-  --surface-secondary: #3e4450;
-  --surface-tertiary: #464d5a;
-  --overlay: #3a404a;
-  --default: #404651;
-  --field-background: #3a404a;
-  --border: #5a6270;
-  --separator: #4a5160;
-  --muted: #a8b0bd;
-  --foreground: #f2f4f7;
+html,
+html.light,
+html[data-theme="light"] {
+  color-scheme: light;
+  --background: #f4f6f8;
+  --background-secondary: #eef1f5;
+  --background-tertiary: #e6ebf1;
+  --surface: #ffffff;
+  --surface-secondary: #f3f6f9;
+  --surface-tertiary: #e8edf3;
+  --overlay: #ffffff;
+  --default: #e7edf4;
+  --field-background: #ffffff;
+  --border: #c3ccd6;
+  --separator: #d5dde6;
+  --muted: #4b5563;
+  --foreground: #1a1d23;
   --surface-foreground: var(--foreground);
   --default-foreground: var(--foreground);
   --overlay-foreground: var(--foreground);
   --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
 }
 
 html,

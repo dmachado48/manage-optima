@@ -18,8 +18,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="pt"
-      data-theme="dark"
-      className={`${plexSans.variable} dark h-full antialiased`}
+      data-theme="light"
+      className={`${plexSans.variable} light h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">{children}</body>
     </html>

@@ -567,7 +567,7 @@ export function ClientSheet({
                 <span
                   className={
                     client.relation === "partner"
-                      ? "rounded bg-[color-mix(in_oklab,var(--blue-600)_22%,transparent)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--blue-200)]"
+                      ? "rounded bg-[color-mix(in_oklab,var(--blue-600)_22%,transparent)] px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--blue-800)]"
                       : "rounded bg-foreground/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted"
                   }
                 >

@@ -587,7 +587,7 @@ export function SettingsDesk({
           <section className="rounded-xl border border-[color-mix(in_oklab,var(--blue-500)_28%,transparent)] bg-[color-mix(in_oklab,var(--blue-950)_55%,var(--surface))] p-4">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
               <div>
-                <h2 className="text-sm font-medium text-[var(--blue-200)]">
+                <h2 className="text-sm font-medium text-[var(--blue-800)]">
                   Pulse {year} · {displayVat}
                 </h2>
                 <p className="text-sm text-muted">
@@ -601,7 +601,7 @@ export function SettingsDesk({
                     / {eur(goalAnnual)}
                   </span>
                 </p>
-                <p className="mt-0.5 text-[11px] tabular-nums text-[var(--blue-300)]">
+                <p className="mt-0.5 text-[11px] tabular-nums text-[var(--blue-700)]">
                   s/ IVA {eur(totalVatBases.withoutVat)} · c/ IVA{" "}
                   {eur(totalVatBases.withVat)}
                 </p>
@@ -618,14 +618,14 @@ export function SettingsDesk({
               />
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-              <span className="text-[var(--blue-300)]">{pace}% do target</span>
+              <span className="text-[var(--blue-700)]">{pace}% do target</span>
               <span>
                 Gap {annualGap >= 0 ? eur(annualGap) : `+${eur(-annualGap)}`}
               </span>
               <span>Intervenções {eur(displayActuals.maintenance)}</span>
               <span>Avenças {eur(displayActuals.retainers)}</span>
               <span>Aprovadas {eur(displayActuals.projects)}</span>
-              <span className="text-[var(--blue-400)]">
+              <span className="text-[var(--blue-700)]">
                 Em aberto {eur(displayActuals.pipeline?.sentEur ?? 0)}{" "}
                 <span className="text-[10px] uppercase tracking-wide opacity-80">
                   · não conta
@@ -653,7 +653,7 @@ export function SettingsDesk({
                   className={
                     selectedQuarter == null
                       ? "pulse-chip bg-[var(--blue-600)] text-white"
-                      : "pulse-chip bg-[var(--pulse-track)] text-[var(--blue-200)]"
+                      : "pulse-chip bg-[var(--pulse-track)] text-[var(--blue-800)]"
                   }
                 >
                   Ano
@@ -666,7 +666,7 @@ export function SettingsDesk({
                     className={
                       selectedQuarter === i
                         ? "pulse-chip bg-[var(--blue-600)] text-white"
-                        : "pulse-chip bg-[var(--pulse-track)] text-[var(--blue-200)]"
+                        : "pulse-chip bg-[var(--pulse-track)] text-[var(--blue-800)]"
                     }
                   >
                     Q{i + 1}
@@ -689,7 +689,7 @@ export function SettingsDesk({
                     "Propostas enviadas",
                     pulseScope.sent,
                     pulseScopeDisplay.sentEur,
-                    "var(--blue-300)",
+                    "var(--blue-600)",
                     "Em aberto — potencial, fora do total",
                   ],
                   [
@@ -719,7 +719,7 @@ export function SettingsDesk({
                   key={label}
                   className="rounded-lg border border-[color-mix(in_oklab,var(--blue-500)_20%,transparent)] bg-[color-mix(in_oklab,var(--blue-950)_40%,transparent)] p-3"
                 >
-                  <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--blue-300)]">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--blue-700)]">
                     {label}
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
@@ -761,7 +761,7 @@ export function SettingsDesk({
                 <button
                   type="button"
                   onClick={redistributeEffort}
-                  className="rounded-md border border-[var(--blue-600)] bg-[color-mix(in_oklab,var(--blue-600)_20%,transparent)] px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--blue-100)] hover:bg-[color-mix(in_oklab,var(--blue-600)_35%,transparent)]"
+                  className="rounded-md border border-[var(--blue-600)] bg-[color-mix(in_oklab,var(--blue-600)_20%,transparent)] px-2.5 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--blue-900)] hover:bg-[color-mix(in_oklab,var(--blue-600)_35%,transparent)]"
                 >
                   Ajustar esforço
                 </button>
@@ -770,7 +770,7 @@ export function SettingsDesk({
                 “Ajustar esforço” fixa os quarters passados no faturado real e
                 redistribui o resto do target anual. Totais em {displayVat}.
                 {effortHint ? (
-                  <span className="mt-1 block text-[var(--blue-300)]">
+                  <span className="mt-1 block text-[var(--blue-700)]">
                     {effortHint}
                   </span>
                 ) : null}
@@ -805,7 +805,7 @@ export function SettingsDesk({
                         }
                       >
                         <div className="mb-2 flex items-center justify-between gap-2">
-                          <p className="text-xs font-medium uppercase tracking-wide text-[var(--blue-300)]">
+                          <p className="text-xs font-medium uppercase tracking-wide text-[var(--blue-700)]">
                             Q{i + 1}
                             {isCurrent
                               ? " · atual"
@@ -842,7 +842,7 @@ export function SettingsDesk({
                             : ""}
                         </p>
                         <div className="mb-2">
-                          <div className="mb-1 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-[var(--blue-300)]">
+                          <div className="mb-1 flex items-center justify-between gap-2 text-[10px] uppercase tracking-wide text-[var(--blue-700)]">
                             <span>Em aberto (não no total)</span>
                             <span className="tabular-nums">
                               {qPipe?.sent ?? 0} ·{" "}
@@ -854,7 +854,7 @@ export function SettingsDesk({
                           </div>
                           <div className="pulse-bar-track h-1.5">
                             <div
-                              className="pulse-bar-fill bg-[var(--blue-300)]"
+                              className="pulse-bar-fill bg-[var(--blue-600)]"
                               style={{
                                 width: `${Math.round(
                                   ((displayActuals.pipelineByQuarter[i]
@@ -867,19 +867,19 @@ export function SettingsDesk({
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-1">
-                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--pulse-pipeline)_25%,transparent)] text-[var(--blue-200)]">
+                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--pulse-pipeline)_25%,transparent)] text-[var(--blue-800)]">
                             Pipe {qPipe?.pipeline ?? 0}
                           </span>
-                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--blue-300)_30%,transparent)] text-[var(--blue-100)]">
+                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--blue-300)_30%,transparent)] text-[var(--blue-900)]">
                             Sent {qPipe?.sent ?? 0}
                           </span>
-                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--blue-500)_28%,transparent)] text-[var(--blue-100)]">
+                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--blue-500)_28%,transparent)] text-[var(--blue-900)]">
                             Av. {qPipe?.retainers ?? 0}
                           </span>
-                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--pulse-approved)_30%,transparent)] text-[var(--blue-100)]">
+                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--pulse-approved)_30%,transparent)] text-[var(--blue-900)]">
                             OK {qPipe?.approved ?? 0}
                           </span>
-                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--pulse-rejected)_35%,transparent)] text-[var(--blue-200)]">
+                          <span className="pulse-chip bg-[color-mix(in_oklab,var(--pulse-rejected)_35%,transparent)] text-[var(--blue-800)]">
                             No {qPipe?.rejected ?? 0}
                           </span>
                         </div>
@@ -942,7 +942,7 @@ export function SettingsDesk({
                         </div>
                         <div className="pulse-bar-track mb-1 h-1">
                           <div
-                            className="pulse-bar-fill bg-[var(--blue-400)]"
+                            className="pulse-bar-fill bg-[var(--blue-600)]"
                             style={{ width: `${share}%` }}
                           />
                         </div>
@@ -957,7 +957,7 @@ export function SettingsDesk({
                 </ol>
               )}
               <div className="mt-4 border-t border-border pt-3 text-sm">
-                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--blue-300)]">
+                <p className="mb-1 text-xs font-medium uppercase tracking-wide text-[var(--blue-700)]">
                   Mix ·{" "}
                   {selectedQuarter == null
                     ? "Ano"
