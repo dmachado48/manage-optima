@@ -228,10 +228,7 @@ export async function setInterventionBillingStatusForm(
   await setInterventionBillingStatus(interventionId, status);
 }
 
-/** Delete an hour/billing record. Reverses pack/avença hours when included. */
-export async function deleteIntervention(interventionId: string) {
-  await requireAdmin();
-
+async function removeInterventionRecord(interventionId: string) {
   const intervention = await prisma.intervention.findUnique({
     where: { id: interventionId },
     select: {
@@ -244,7 +241,6 @@ export async function deleteIntervention(interventionId: string) {
         select: {
           id: true,
           source: true,
-          closedAt: true,
           _count: { select: { interventions: true } },
         },
       },
@@ -275,18 +271,47 @@ export async function deleteIntervention(interventionId: string) {
     }
 
     await tx.intervention.delete({ where: { id: intervention.id } });
-
-    // Orphan ad-hoc shell created only for this hour log — remove it too.
-    if (
-      intervention.request.source === "ad_hoc" &&
-      intervention.request._count.interventions <= 1
-    ) {
-      await tx.request.delete({ where: { id: intervention.requestId } });
-    }
   });
 
-  revalidateInterventionPaths(intervention.clientId);
+  // Drop the empty ad-hoc shell after the hour log is gone, so a foreign
+  // key on the request cannot roll the intervention back into the list.
+  const request = intervention.request;
+  if (
+    request?.source === "ad_hoc" &&
+    request._count.interventions <= 1
+  ) {
+    await prisma.inboundEmail.updateMany({
+      where: { requestId: intervention.requestId },
+      data: { requestId: null },
+    });
+    await prisma.request
+      .delete({ where: { id: intervention.requestId } })
+      .catch(() => undefined);
+  }
+
+  return intervention.clientId;
+}
+
+/** Delete an hour/billing record. Reverses pack/avença hours when included. */
+export async function deleteIntervention(interventionId: string) {
+  await requireAdmin();
+  const clientId = await removeInterventionRecord(interventionId);
+  revalidateInterventionPaths(clientId);
   return { ok: true as const };
+}
+
+/** Delete the selected hour/billing records. */
+export async function deleteInterventions(interventionIds: string[]) {
+  await requireAdmin();
+  const ids = [...new Set(interventionIds.filter(Boolean))];
+  if (ids.length === 0) throw new Error("Seleciona pelo menos uma intervenção");
+
+  const clientIds = new Set<string>();
+  for (const id of ids) {
+    clientIds.add(await removeInterventionRecord(id));
+  }
+  for (const clientId of clientIds) revalidateInterventionPaths(clientId);
+  return { ok: true as const, deleted: ids.length };
 }
 
 /**

@@ -14,6 +14,7 @@ import { updateAlertSettings, updatePlatformConfig } from "@/app/actions/setting
 import {
   billSelectedInterventions,
   deleteIntervention,
+  deleteInterventions,
   setInterventionBillingStatusForm,
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
@@ -1127,6 +1128,40 @@ export function SettingsDesk({
                     ? "Faturar e gerar relatório"
                     : "Aplicar a selecionadas"}
                 </Button>
+                <button
+                  type="button"
+                  disabled={pending || selectedVisible.length === 0}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-red-600 hover:bg-red-500/10 disabled:opacity-50"
+                  onClick={() => {
+                    const ids = selectedVisible.map((i) => i.id);
+                    if (ids.length === 0) return;
+                    if (
+                      !window.confirm(
+                        ids.length === 1
+                          ? `Apagar a intervenção «${selectedVisible[0]?.requestTitle ?? ""}»? Esta ação não se pode desfazer.`
+                          : `Apagar ${ids.length} intervenções? Esta ação não se pode desfazer.`,
+                      )
+                    ) {
+                      return;
+                    }
+                    setBulkError(null);
+                    startTransition(async () => {
+                      try {
+                        await deleteInterventions(ids);
+                        setSelectedIds([]);
+                        router.refresh();
+                      } catch (e) {
+                        setBulkError(
+                          e instanceof Error
+                            ? e.message
+                            : "Erro ao apagar as intervenções",
+                        );
+                      }
+                    });
+                  }}
+                >
+                  Apagar
+                </button>
                 <button
                   type="button"
                   className="text-xs text-muted underline-offset-2 hover:underline"
