@@ -84,9 +84,18 @@ export async function logIntervention(input: QuickLogInput) {
   });
   if (!client) throw new Error("Cliente não encontrado");
 
-  let requestId = input.requestId ?? null;
+  let requestId = input.requestId?.trim() || null;
+  /** Hour-only logs must not appear as open pipeline cards. */
+  const createClosedAdHoc = !requestId;
 
-  if (!requestId) {
+  const performedAt = input.performedAt
+    ? new Date(input.performedAt)
+    : new Date();
+  if (Number.isNaN(performedAt.getTime())) {
+    throw new Error("Data de conclusão inválida");
+  }
+
+  if (createClosedAdHoc) {
     const title =
       input.createAdHocTitle?.trim() ||
       input.note?.trim() ||
@@ -94,10 +103,13 @@ export async function logIntervention(input: QuickLogInput) {
     const request = await prisma.request.create({
       data: {
         clientId: input.clientId,
-        title,
+        title: title.slice(0, 200),
         description: input.note ?? null,
         source: "ad_hoc",
-        status: "in_progress",
+        // Finalized immediately — lives in finance/history, not the pipeline.
+        status: "done",
+        closeKind: "hours",
+        closedAt: performedAt,
       },
     });
     requestId = request.id;
@@ -121,13 +133,6 @@ export async function logIntervention(input: QuickLogInput) {
       } else {
         billingStatus = "billable";
       }
-    }
-
-    const performedAt = input.performedAt
-      ? new Date(input.performedAt)
-      : new Date();
-    if (Number.isNaN(performedAt.getTime())) {
-      throw new Error("Data de conclusão inválida");
     }
 
     const created = await tx.intervention.create({
@@ -162,6 +167,8 @@ export async function logIntervention(input: QuickLogInput) {
   });
 
   revalidateInterventionPaths(input.clientId);
+  revalidatePath("/");
+  revalidatePath("/finance");
   return { id: intervention.id, requestId };
 }
 

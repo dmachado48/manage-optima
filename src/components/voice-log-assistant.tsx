@@ -314,13 +314,13 @@ export function VoiceLogAssistant({
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-xs text-muted">Pedido (opcional)</span>
+        <span className="text-xs text-muted">Ligar a pedido aberto (opcional)</span>
         <select
           className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
           value={requestId}
           onChange={(e) => setRequestId(e.target.value)}
         >
-          <option value="">Criar pedido avulso</option>
+          <option value="">Só faturação — não cria card no pipeline</option>
           {filteredRequests.map((r) => (
             <option key={r.id} value={r.id}>
               {r.title}

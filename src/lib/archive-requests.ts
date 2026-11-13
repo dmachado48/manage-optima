@@ -4,11 +4,52 @@ import { getPlatformConfig } from "@/lib/platform-config";
 import { prisma } from "@/lib/prisma";
 
 /**
+ * Older Quick Log entries created an open `ad_hoc` pipeline card for every
+ * hour log. Close those so they only live in finance/history.
+ */
+export async function finalizeOrphanAdHocHourLogs(): Promise<number> {
+  const orphans = await prisma.request.findMany({
+    where: {
+      source: "ad_hoc",
+      closedAt: null,
+      archivedAt: null,
+      interventions: { some: {} },
+    },
+    select: {
+      id: true,
+      interventions: {
+        select: { performedAt: true },
+        orderBy: { performedAt: "desc" },
+        take: 1,
+      },
+    },
+    take: 500,
+  });
+
+  let count = 0;
+  for (const r of orphans) {
+    const closedAt = r.interventions[0]?.performedAt ?? new Date();
+    await prisma.request.update({
+      where: { id: r.id },
+      data: {
+        status: "done",
+        closeKind: "hours",
+        closedAt,
+      },
+    });
+    count += 1;
+  }
+  return count;
+}
+
+/**
  * Archive completed requests whose work is already billed (nothing left
  * billable) and whose last billing date is older than the configured days.
  * Archived requests never appear in the pipeline.
  */
 export async function archiveBilledRequests(): Promise<number> {
+  await finalizeOrphanAdHocHourLogs();
+
   const config = await getPlatformConfig();
   const days = Math.min(
     365,

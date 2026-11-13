@@ -81,8 +81,12 @@ export function NewRequestPanel({
         </label>
         {error ? <p className="text-xs text-danger">{error}</p> : null}
         <Button type="submit" variant="primary" isDisabled={pending}>
-          {pending ? "A criar…" : "Criar"}
+          {pending ? "A criar…" : "Criar no pipeline"}
         </Button>
+        <p className="text-[10px] leading-relaxed text-muted">
+          Isto cria um card no pipeline. Para só registar horas a faturar, usa
+          «Registar» / «Voz».
+        </p>
       </form>
     );
   }
@@ -90,7 +94,8 @@ export function NewRequestPanel({
   return (
     <>
       <aside className="hidden w-64 shrink-0 flex-col border-l border-border bg-surface/50 p-3 xl:flex">
-        <h2 className="mb-3 text-sm font-medium">Novo pedido</h2>
+        <h2 className="mb-1 text-sm font-medium">Novo pedido</h2>
+        <p className="mb-3 text-[11px] text-muted">Entra no pipeline</p>
         <FormBody />
       </aside>
 
@@ -98,7 +103,7 @@ export function NewRequestPanel({
         <div className="fixed inset-0 z-50 flex items-end bg-black/40 xl:hidden">
           <div className="w-full rounded-t-2xl bg-surface p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-medium">Novo pedido</h2>
+              <h2 className="text-sm font-medium">Novo pedido (pipeline)</h2>
               <button
                 type="button"
                 className="text-sm text-muted"

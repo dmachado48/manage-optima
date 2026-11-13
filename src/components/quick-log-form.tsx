@@ -87,19 +87,23 @@ export function QuickLogForm({
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-xs text-muted">Pedido (opcional)</span>
+        <span className="text-xs text-muted">Ligar a pedido aberto (opcional)</span>
         <select
           className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
           value={requestId}
           onChange={(e) => setRequestId(e.target.value)}
         >
-          <option value="">Criar pedido avulso</option>
+          <option value="">Só faturação — não cria card no pipeline</option>
           {filteredRequests.map((r) => (
             <option key={r.id} value={r.id}>
               {r.title}
             </option>
           ))}
         </select>
+        <span className="text-[10px] text-muted">
+          Pedido = trabalho no pipeline. Horas = registo para faturar. Sem
+          pedido ligado, as horas vão só para o Financeiro.
+        </span>
       </label>
 
       <div className="flex flex-col gap-1 text-sm">
