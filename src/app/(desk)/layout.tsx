@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { DeskShell } from "@/components/desk-shell";
+import { getBillingAlerts } from "@/lib/billing-alerts";
 import { getPlatformConfig } from "@/lib/platform-config";
 import { prisma } from "@/lib/prisma";
 
@@ -10,7 +11,7 @@ export default async function DeskLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [clients, openRequests, platform] = await Promise.all([
+  const [clients, openRequests, platform, billingAlerts] = await Promise.all([
     prisma.client.findMany({
       where: { active: true },
       select: { id: true, name: true },
@@ -22,6 +23,7 @@ export default async function DeskLayout({
       orderBy: { updatedAt: "desc" },
     }),
     getPlatformConfig(),
+    getBillingAlerts(),
   ]);
 
   return (
@@ -29,6 +31,7 @@ export default async function DeskLayout({
       <DeskShell
         clients={clients}
         openRequests={openRequests}
+        billingAlerts={billingAlerts}
         idleNudge={{
           enabled: platform.alertRegisterEnabled,
           soundEnabled: platform.alertRegisterSoundEnabled,

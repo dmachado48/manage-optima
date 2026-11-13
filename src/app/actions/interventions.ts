@@ -61,6 +61,7 @@ async function ensureRetainerPeriod(
 
 function revalidateInterventionPaths(clientId?: string) {
   revalidatePath("/");
+  revalidatePath("/finance");
   revalidatePath("/maintenance");
   revalidatePath("/settings");
   revalidatePath("/clients");
@@ -225,6 +226,67 @@ export async function setInterventionBillingStatusForm(
     formData.get("billingStatus") ?? "",
   ) as InterventionBillingStatus;
   await setInterventionBillingStatus(interventionId, status);
+}
+
+/** Delete an hour/billing record. Reverses pack/avença hours when included. */
+export async function deleteIntervention(interventionId: string) {
+  await requireAdmin();
+
+  const intervention = await prisma.intervention.findUnique({
+    where: { id: interventionId },
+    select: {
+      id: true,
+      clientId: true,
+      requestId: true,
+      minutes: true,
+      billingStatus: true,
+      request: {
+        select: {
+          id: true,
+          source: true,
+          closedAt: true,
+          _count: { select: { interventions: true } },
+        },
+      },
+    },
+  });
+  if (!intervention) throw new Error("Registo não encontrado");
+
+  await prisma.$transaction(async (tx) => {
+    if (
+      intervention.billingStatus === "included" &&
+      intervention.minutes > 0
+    ) {
+      const active = await tx.contract.findFirst({
+        where: { clientId: intervention.clientId, active: true },
+      });
+      if (active && shouldDeduct(active.type)) {
+        await tx.contract.update({
+          where: { id: active.id },
+          data: {
+            hoursUsed: Math.max(
+              0,
+              Number(active.hoursUsed) -
+                hoursFromMinutes(intervention.minutes),
+            ),
+          },
+        });
+      }
+    }
+
+    await tx.intervention.delete({ where: { id: intervention.id } });
+
+    // Orphan ad-hoc shell created only for this hour log — remove it too.
+    if (
+      intervention.request.source === "ad_hoc" &&
+      intervention.request._count.interventions <= 1
+    ) {
+      await tx.request.delete({ where: { id: intervention.requestId } });
+    }
+  });
+
+  revalidateInterventionPaths(intervention.clientId);
+  return { ok: true as const };
 }
 
 /**

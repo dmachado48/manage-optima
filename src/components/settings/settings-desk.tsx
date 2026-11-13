@@ -13,6 +13,7 @@ import { upsertFinanceYear } from "@/app/actions/finance";
 import { updateAlertSettings, updatePlatformConfig } from "@/app/actions/settings";
 import {
   billSelectedInterventions,
+  deleteIntervention,
   setInterventionBillingStatusForm,
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
@@ -1319,6 +1320,37 @@ export function SettingsDesk({
                             Faturar
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          disabled={pending}
+                          className="rounded-md border border-border px-2 py-1 text-xs text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Apagar o registo «${i.requestTitle}»?`,
+                              )
+                            ) {
+                              return;
+                            }
+                            startTransition(async () => {
+                              try {
+                                await deleteIntervention(i.id);
+                                setSelectedIds((prev) =>
+                                  prev.filter((id) => id !== i.id),
+                                );
+                                router.refresh();
+                              } catch (e) {
+                                setBulkError(
+                                  e instanceof Error
+                                    ? e.message
+                                    : "Erro ao apagar",
+                                );
+                              }
+                            });
+                          }}
+                        >
+                          Apagar
+                        </button>
                       </td>
                     </tr>
                   ))

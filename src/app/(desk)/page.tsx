@@ -1,8 +1,6 @@
 import { Suspense } from "react";
-import { BillingAlertsBanner } from "@/components/billing-alerts-banner";
 import { PipelineBoard } from "@/components/pipeline/pipeline-board";
 import { archiveBilledRequests } from "@/lib/archive-requests";
-import { getBillingAlerts } from "@/lib/billing-alerts";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +8,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   await archiveBilledRequests();
 
-  const [clients, requests, billingAlerts] = await Promise.all([
+  const [clients, requests] = await Promise.all([
     prisma.client.findMany({
       where: { active: true },
       select: { id: true, name: true },
@@ -24,7 +22,6 @@ export default async function HomePage() {
       },
       orderBy: { updatedAt: "desc" },
     }),
-    getBillingAlerts(),
   ]);
 
   return (
@@ -35,12 +32,6 @@ export default async function HomePage() {
           A tua lista de trabalho — abre um pedido para falar com o cliente
         </p>
       </div>
-
-      {billingAlerts.length > 0 ? (
-        <div className="pt-4">
-          <BillingAlertsBanner alerts={billingAlerts} />
-        </div>
-      ) : null}
 
       <Suspense
         fallback={<div className="py-6 text-sm text-muted">A carregar…</div>}

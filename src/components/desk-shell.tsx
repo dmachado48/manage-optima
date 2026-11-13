@@ -8,6 +8,8 @@ import { logoutAction } from "@/app/actions/auth";
 import { DeskChromeProvider } from "@/components/desk-chrome-context";
 import { IdleNudge, type IdleNudgeSettings } from "@/components/idle-nudge";
 import { QuickLogModal } from "@/components/quick-log-modal";
+import { SidebarAlerts } from "@/components/sidebar-alerts";
+import type { BillingAlert } from "@/lib/billing";
 
 const MODULES = [
   { href: "/", label: "Pipeline", short: "Pipe." },
@@ -31,11 +33,13 @@ export function DeskShell({
   children,
   clients,
   openRequests,
+  billingAlerts = [],
   idleNudge,
 }: {
   children: React.ReactNode;
   clients: ClientOption[];
   openRequests: RequestOption[];
+  billingAlerts?: BillingAlert[];
   idleNudge: IdleNudgeSettings;
 }) {
   const pathname = usePathname();
@@ -144,8 +148,8 @@ export function DeskShell({
         </header>
 
         <div className="flex min-h-0 flex-1">
-          <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-52 shrink-0 flex-col border-r border-border bg-surface/70 px-3 py-4 md:flex">
-            <nav className="flex flex-1 flex-col gap-1">
+          <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col border-r border-border bg-surface/70 px-3 py-4 md:flex">
+            <nav className="flex shrink-0 flex-col gap-1">
               {MODULES.map((m) => {
                 const active = isActive(pathname, m.href);
                 return (
@@ -154,8 +158,8 @@ export function DeskShell({
                     href={m.href}
                     className={
                       active
-                        ? "rounded-lg bg-[color-mix(in_oklab,var(--blue-600)_14%,transparent)] px-3 py-2 text-sm font-medium text-[var(--blue-900)]"
-                        : "rounded-lg px-3 py-2 text-sm text-muted hover:bg-[color-mix(in_oklab,var(--blue-600)_10%,transparent)] hover:text-[var(--blue-800)]"
+                        ? "rounded-lg bg-[color-mix(in_oklab,var(--blue-600)_28%,transparent)] px-3 py-2 text-sm font-medium text-[var(--blue-100)]"
+                        : "rounded-lg px-3 py-2 text-sm text-muted hover:bg-[color-mix(in_oklab,var(--blue-900)_40%,transparent)] hover:text-[var(--blue-200)]"
                     }
                   >
                     {m.label}
@@ -163,14 +167,7 @@ export function DeskShell({
                 );
               })}
             </nav>
-            <form action={logoutAction} className="md:hidden">
-              <button
-                type="submit"
-                className="w-full px-2 py-1 text-left text-xs text-muted hover:underline"
-              >
-                Sair
-              </button>
-            </form>
+            <SidebarAlerts alerts={billingAlerts} />
           </aside>
 
           <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
