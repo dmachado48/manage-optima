@@ -62,6 +62,7 @@ export function VoiceLogAssistant({
   const [clientId, setClientId] = useState(clients[0]?.id ?? "");
   const [requestId, setRequestId] = useState("");
   const [minutes, setMinutes] = useState(30);
+  const [customHours, setCustomHours] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
@@ -89,7 +90,14 @@ export function VoiceLogAssistant({
       text,
       clients.map((c) => c.name),
     );
-    if (parsed.minutes) setMinutes(parsed.minutes);
+    if (parsed.minutes) {
+      setMinutes(parsed.minutes);
+      setCustomHours(
+        MINUTE_OPTIONS.includes(parsed.minutes)
+          ? ""
+          : String(parsed.minutes / 60),
+      );
+    }
     if (parsed.note) setNote(parsed.note);
     const matched = matchClientId(parsed.clientHint, clients);
     if (matched) {
@@ -251,6 +259,7 @@ export function VoiceLogAssistant({
         setNote("");
         setRequestId("");
         setMinutes(30);
+        setCustomHours("");
         router.refresh();
         onDone?.();
       } catch (e) {
@@ -314,19 +323,23 @@ export function VoiceLogAssistant({
       </label>
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-xs text-muted">Ligar a pedido aberto (opcional)</span>
+        <span className="text-xs text-muted">Associar a um pedido</span>
         <select
           className="rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
           value={requestId}
           onChange={(e) => setRequestId(e.target.value)}
         >
-          <option value="">Só faturação — não cria card no pipeline</option>
+          <option value="">Nenhum — só registar as horas</option>
           {filteredRequests.map((r) => (
             <option key={r.id} value={r.id}>
               {r.title}
             </option>
           ))}
         </select>
+        <span className="text-[11px] text-muted">
+          Opcional. Se escolheres um pedido em aberto, estas horas ficam nesse
+          trabalho.
+        </span>
       </label>
 
       <div className="flex flex-col gap-1 text-sm">
@@ -336,9 +349,12 @@ export function VoiceLogAssistant({
             <button
               key={m}
               type="button"
-              onClick={() => setMinutes(m)}
+              onClick={() => {
+                setMinutes(m);
+                setCustomHours("");
+              }}
               className={
-                minutes === m
+                customHours === "" && minutes === m
                   ? "rounded-sm bg-accent px-2.5 py-1 text-white"
                   : "rounded-sm bg-default px-2.5 py-1"
               }
@@ -347,14 +363,25 @@ export function VoiceLogAssistant({
             </button>
           ))}
         </div>
-        <input
-          type="number"
-          min={0}
-          step={15}
-          value={minutes}
-          onChange={(e) => setMinutes(Number(e.target.value) || 0)}
-          className="mt-1 w-28 rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
-        />
+        <label className="mt-1 flex flex-col gap-1">
+          <span className="text-xs text-muted">Outro tempo (horas)</span>
+          <input
+            type="number"
+            min={0.5}
+            step={0.5}
+            inputMode="decimal"
+            value={customHours}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setCustomHours(raw);
+              const n = Number(raw.trim().replace(",", "."));
+              if (Number.isFinite(n) && n > 0) setMinutes(Math.round(n * 60));
+              if (raw.trim() === "") setMinutes(30);
+            }}
+            placeholder="ex. 3"
+            className="w-28 rounded-md border border-border bg-surface px-2 py-1.5 text-sm"
+          />
+        </label>
       </div>
 
       <label className="flex flex-col gap-1 text-sm">

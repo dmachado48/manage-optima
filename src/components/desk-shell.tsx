@@ -21,7 +21,11 @@ const MODULES = [
   { href: "/projects", label: "Projetos", short: "Proj." },
 ] as const;
 
-type ClientOption = { id: string; name: string };
+type ClientOption = {
+  id: string;
+  name: string;
+  contractType?: "pack" | "retainer" | "hourly" | null;
+};
 type RequestOption = { id: string; title: string; clientId: string };
 
 function isActive(pathname: string, href: string) {
@@ -171,12 +175,12 @@ export function DeskShell({
             <SidebarAlerts alerts={billingAlerts} />
           </aside>
 
-          <div className="flex min-w-0 flex-1 flex-col pb-20 md:pb-0">
+          <div className="desk-mobile-nav-spacer flex min-w-0 flex-1 flex-col">
             {children}
           </div>
         </div>
 
-        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-border bg-surface/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
+        <nav className="desk-mobile-nav fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-border bg-surface/95 px-1 backdrop-blur md:hidden">
           {MODULES.map((m) => {
             const active = isActive(pathname, m.href);
             return (

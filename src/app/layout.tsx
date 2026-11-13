@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans } from "next/font/google";
 import "./globals.css";
 
@@ -12,6 +12,12 @@ export const metadata: Metadata = {
   title: "Optima Desk",
   description: "Gestão de manutenção, projetos e comercial — Webiton",
   manifest: "/manifest.webmanifest",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

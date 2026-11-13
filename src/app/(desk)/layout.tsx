@@ -14,7 +14,15 @@ export default async function DeskLayout({
   const [clients, openRequests, platform, billingAlerts] = await Promise.all([
     prisma.client.findMany({
       where: { active: true },
-      select: { id: true, name: true },
+      select: {
+        id: true,
+        name: true,
+        contracts: {
+          where: { active: true },
+          select: { type: true },
+          take: 1,
+        },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.request.findMany({
@@ -29,7 +37,11 @@ export default async function DeskLayout({
   return (
     <Suspense fallback={<div className="min-h-full flex-1 bg-[var(--background)]" />}>
       <DeskShell
-        clients={clients}
+        clients={clients.map((client) => ({
+          id: client.id,
+          name: client.name,
+          contractType: client.contracts[0]?.type ?? null,
+        }))}
         openRequests={openRequests}
         billingAlerts={billingAlerts}
         idleNudge={{

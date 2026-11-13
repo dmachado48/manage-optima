@@ -5,7 +5,11 @@ import { useState } from "react";
 import { QuickLogForm } from "@/components/quick-log-form";
 import { VoiceLogAssistant } from "@/components/voice-log-assistant";
 
-type ClientOption = { id: string; name: string };
+type ClientOption = {
+  id: string;
+  name: string;
+  contractType?: "pack" | "retainer" | "hourly" | null;
+};
 type RequestOption = { id: string; title: string; clientId: string };
 
 export function QuickLogModal({
@@ -27,7 +31,7 @@ export function QuickLogModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-      <Card className="w-full max-w-md p-4 shadow-xl">
+      <Card className="flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden p-4 shadow-xl">
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-lg font-medium">Registar trabalho</h2>
           <Button variant="ghost" onPress={() => onOpenChange(false)}>
@@ -60,19 +64,21 @@ export function QuickLogModal({
           </button>
         </div>
 
-        {mode === "voice" ? (
-          <VoiceLogAssistant
-            clients={clients}
-            openRequests={openRequests}
-            onDone={() => onOpenChange(false)}
-          />
-        ) : (
-          <QuickLogForm
-            clients={clients}
-            openRequests={openRequests}
-            onSuccess={() => onOpenChange(false)}
-          />
-        )}
+        <div className="min-h-0 overflow-y-auto">
+          {mode === "voice" ? (
+            <VoiceLogAssistant
+              clients={clients}
+              openRequests={openRequests}
+              onDone={() => onOpenChange(false)}
+            />
+          ) : (
+            <QuickLogForm
+              clients={clients}
+              openRequests={openRequests}
+              onSuccess={() => onOpenChange(false)}
+            />
+          )}
+        </div>
       </Card>
     </div>
   );

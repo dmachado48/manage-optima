@@ -53,11 +53,16 @@ export function ClientPortal({
             Portal do cliente — podes criar pedidos; o estado é atualizado pela
             Webiton.
           </p>
-          {remaining != null && contractType ? (
+          {contractType ? (
             <p className="mt-2 text-sm">
-              {CONTRACT_TYPE_LABELS[contractType]}:{" "}
-              <span className="font-medium">{remaining} h restantes</span> de{" "}
-              {hoursTotal} h
+              {CONTRACT_TYPE_LABELS[contractType]}
+              {remaining != null ? (
+                <>
+                  :{" "}
+                  <span className="font-medium">{remaining} h restantes</span>{" "}
+                  de {hoursTotal} h
+                </>
+              ) : null}
             </p>
           ) : (
             <p className="mt-2 text-sm text-muted">
