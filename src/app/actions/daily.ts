@@ -57,6 +57,33 @@ export async function addManualPlanItem(formData: FormData) {
   revalidatePath("/");
 }
 
+export async function updateManualPlanItem(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!id || !title) throw new Error("Título obrigatório");
+
+  const item = await prisma.dailyPlanItem.findUnique({ where: { id } });
+  if (!item) throw new Error("Item não encontrado");
+
+  await prisma.dailyPlanItem.update({
+    where: { id },
+    data: { title },
+  });
+  revalidatePath("/");
+}
+
+export async function deleteManualPlanItem(planItemId: string) {
+  await requireAdmin();
+  const item = await prisma.dailyPlanItem.findUnique({
+    where: { id: planItemId },
+  });
+  if (!item) throw new Error("Item não encontrado");
+
+  await prisma.dailyPlanItem.delete({ where: { id: planItemId } });
+  revalidatePath("/");
+}
+
 export async function togglePlanItem(planItemId: string, done: boolean) {
   await requireAdmin();
   await prisma.dailyPlanItem.update({

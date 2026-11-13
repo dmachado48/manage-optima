@@ -68,24 +68,6 @@ body {
   font-family: var(--font-desk), "IBM Plex Sans", system-ui, sans-serif;
 }
 
-/* Barra inferior no telemóvel: o mínimo fica sempre, e cresce com a safe area. */
-.desk-mobile-nav {
-  padding-top: 0.5rem;
-  padding-bottom: 0.75rem;
-  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
-}
-
-.desk-mobile-nav-spacer {
-  padding-bottom: 5rem;
-  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
-}
-
-@media (min-width: 768px) {
-  .desk-mobile-nav-spacer {
-    padding-bottom: 0;
-  }
-}
-
 /* Largura das páginas do desk — full bleed dentro da área de conteúdo */
 .desk-page {
   width: 100%;

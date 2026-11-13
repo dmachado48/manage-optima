@@ -6,8 +6,10 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   addManualPlanItem,
+  deleteManualPlanItem,
   saveDayResume,
   togglePlanItem,
+  updateManualPlanItem,
 } from "@/app/actions/daily";
 import {
   markContractBilled,
@@ -165,7 +167,54 @@ export function DailyDesk({
                     <span className="sr-only">{job.title}</span>
                   </Checkbox>
                   <div className="min-w-0 flex-1">
-                    {job.href && !job.done ? (
+                    {job.source === "manual" && job.planItemId ? (
+                      <form
+                        className="flex flex-wrap items-center gap-2"
+                        action={(fd) => {
+                          startTransition(async () => {
+                            await updateManualPlanItem(fd);
+                            refresh();
+                          });
+                        }}
+                      >
+                        <input type="hidden" name="id" value={job.planItemId} />
+                        <input
+                          name="title"
+                          required
+                          defaultValue={job.title}
+                          aria-label="Título do item"
+                          className={
+                            job.done
+                              ? "min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm text-muted line-through"
+                              : "min-w-0 flex-1 rounded border border-border bg-transparent px-2 py-1 text-sm font-medium"
+                          }
+                        />
+                        <button
+                          type="submit"
+                          disabled={pending}
+                          className="text-xs text-muted underline-offset-2 hover:underline disabled:opacity-50"
+                        >
+                          Guardar
+                        </button>
+                        <button
+                          type="button"
+                          disabled={pending}
+                          className="text-xs text-red-600 underline-offset-2 hover:underline disabled:opacity-50"
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Apagar «${job.title}» da lista de hoje?`,
+                              )
+                            ) {
+                              return;
+                            }
+                            run(() => deleteManualPlanItem(job.planItemId!));
+                          }}
+                        >
+                          Apagar
+                        </button>
+                      </form>
+                    ) : job.href && !job.done ? (
                       <Link
                         href={job.href}
                         className="font-medium underline-offset-2 hover:underline"

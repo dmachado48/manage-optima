@@ -12,13 +12,13 @@ import { SidebarAlerts } from "@/components/sidebar-alerts";
 import type { BillingAlert } from "@/lib/billing";
 
 const MODULES = [
-  { href: "/", label: "Pipeline", short: "Pipe." },
-  { href: "/inbox", label: "Inbox", short: "Inbox" },
-  { href: "/clients", label: "Clientes", short: "Clientes" },
-  { href: "/finance", label: "Financeiro", short: "Fin." },
-  { href: "/maintenance", label: "Manutenção", short: "Manut." },
-  { href: "/commercial", label: "Comercial", short: "Comerc." },
-  { href: "/projects", label: "Projetos", short: "Proj." },
+  { href: "/", label: "Pipeline" },
+  { href: "/inbox", label: "Inbox" },
+  { href: "/clients", label: "Clientes" },
+  { href: "/finance", label: "Financeiro" },
+  { href: "/maintenance", label: "Manutenção" },
+  { href: "/commercial", label: "Comercial" },
+  { href: "/projects", label: "Projetos" },
 ] as const;
 
 type ClientOption = {
@@ -84,76 +84,64 @@ export function DeskShell({
   return (
     <DeskChromeProvider value={chrome}>
       <div className="flex min-h-full flex-1 flex-col bg-[var(--background)]">
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface px-3 backdrop-blur sm:px-4">
-          <Link href="/" className="min-w-0 shrink-0">
-            <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--blue-700)]">
-              Webiton
-            </p>
-            <p className="truncate text-sm font-semibold tracking-tight text-[var(--blue-950)]">
-              Optima Desk
-            </p>
-          </Link>
+        <header className="sticky top-0 z-30 shrink-0 border-b border-border bg-surface backdrop-blur">
+          <div className="flex h-14 items-center gap-3 px-3 sm:px-4">
+            <Link href="/" className="min-w-0 shrink-0">
+              <p className="text-[10px] uppercase tracking-[0.14em] text-[var(--blue-700)]">
+                Webiton
+              </p>
+              <p className="truncate text-sm font-semibold tracking-tight text-[var(--blue-950)]">
+                Optima Desk
+              </p>
+            </Link>
 
-          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
-            <Button
-              variant="secondary"
-              onPress={() => openLog("voice")}
-              className="hidden sm:inline-flex"
-            >
-              Voz
-            </Button>
-            <Button
-              variant="primary"
-              onPress={() => openLog("form")}
-              className="hidden sm:inline-flex"
-            >
-              Registar horas
-            </Button>
-            <Button
-              variant="primary"
-              onPress={() => openLog("voice")}
-              className="sm:hidden"
-            >
-              Voz
-            </Button>
-            <Link
-              href="/maintenance"
-              className="tech-btn border border-border bg-surface text-foreground hover:bg-default"
-            >
-              Pedido
-            </Link>
-            <Link
-              href="/projects"
-              className="tech-btn hidden border border-border bg-surface text-foreground hover:bg-default sm:inline-flex"
-            >
-              Projeto
-            </Link>
-            <Link
-              href="/settings"
-              className={
-                settingsActive
-                  ? "tech-btn bg-default font-semibold text-foreground"
-                  : "tech-btn border border-border bg-surface text-muted hover:bg-default hover:text-foreground"
-              }
-              aria-label="Definições"
-              title="Definições"
-            >
-              Definições
-            </Link>
-            <form action={logoutAction} className="hidden md:block">
-              <button
-                type="submit"
-                className="px-2 py-1 text-xs text-muted hover:underline"
+            <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
+              <Button
+                variant="secondary"
+                onPress={() => openLog("voice")}
+                className="hidden sm:inline-flex"
               >
-                Sair
-              </button>
-            </form>
+                Voz
+              </Button>
+              <Button
+                variant="primary"
+                onPress={() => openLog("form")}
+                className="hidden sm:inline-flex"
+              >
+                Registar horas
+              </Button>
+              <Button
+                variant="primary"
+                onPress={() => openLog("voice")}
+                className="sm:hidden"
+              >
+                Voz
+              </Button>
+              <Link
+                href="/settings"
+                className={
+                  settingsActive
+                    ? "tech-btn bg-default font-semibold text-foreground"
+                    : "tech-btn border border-border bg-surface text-muted hover:bg-default hover:text-foreground"
+                }
+                aria-label="Definições"
+                title="Definições"
+              >
+                Definições
+              </Link>
+              <form action={logoutAction} className="hidden md:block">
+                <button
+                  type="submit"
+                  className="px-2 py-1 text-xs text-muted hover:underline"
+                >
+                  Sair
+                </button>
+              </form>
+            </div>
           </div>
-        </header>
 
-        <div className="flex min-h-0 flex-1">
-          <aside className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-56 shrink-0 flex-col border-r border-border bg-surface/70 px-3 py-4 md:flex">
-            <nav className="flex shrink-0 flex-col gap-1">
+          <div className="flex items-center gap-1 px-2 pb-2 sm:px-3">
+            <nav className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
               {MODULES.map((m) => {
                 const active = isActive(pathname, m.href);
                 return (
@@ -163,8 +151,8 @@ export function DeskShell({
                     aria-current={active ? "page" : undefined}
                     className={
                       active
-                        ? "rounded-lg bg-[color-mix(in_oklab,var(--blue-600)_12%,white)] px-3 py-2 text-sm font-medium text-[var(--blue-950)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue-700)]"
-                        : "rounded-lg px-3 py-2 text-sm text-muted hover:bg-[color-mix(in_oklab,var(--blue-600)_8%,white)] hover:text-[var(--blue-900)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue-700)]"
+                        ? "shrink-0 rounded-lg bg-[color-mix(in_oklab,var(--blue-600)_12%,white)] px-2.5 py-1.5 text-sm font-medium text-[var(--blue-950)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue-700)]"
+                        : "shrink-0 rounded-lg px-2.5 py-1.5 text-sm text-muted hover:bg-[color-mix(in_oklab,var(--blue-600)_8%,white)] hover:text-[var(--blue-900)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue-700)]"
                     }
                   >
                     {m.label}
@@ -173,39 +161,10 @@ export function DeskShell({
               })}
             </nav>
             <SidebarAlerts alerts={billingAlerts} />
-          </aside>
-
-          <div className="desk-mobile-nav-spacer flex min-w-0 flex-1 flex-col">
-            {children}
           </div>
-        </div>
+        </header>
 
-        <nav className="desk-mobile-nav fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-border bg-surface/95 px-1 backdrop-blur md:hidden">
-          {MODULES.map((m) => {
-            const active = isActive(pathname, m.href);
-            return (
-              <Link
-                key={m.href}
-                href={m.href}
-                aria-current={active ? "page" : undefined}
-                className={
-                  active
-                    ? "flex min-h-11 min-w-0 flex-1 items-center justify-center px-0.5 text-[11px] font-semibold text-[var(--blue-950)]"
-                    : "flex min-h-11 min-w-0 flex-1 items-center justify-center px-0.5 text-[11px] text-muted"
-                }
-              >
-                {m.short}
-              </Link>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => openLog("voice")}
-            className="flex min-h-11 min-w-0 flex-1 items-center justify-center px-0.5 text-[11px] font-medium text-white bg-accent"
-          >
-            Voz
-          </button>
-        </nav>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
       </div>
 
       <QuickLogModal

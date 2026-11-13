@@ -189,8 +189,7 @@ export function CommercialDesk({
   const [formError, setFormError] = useState<string | null>(null);
 
   const selected = proposals.find((p) => p.id === selectedId) ?? null;
-  const canEdit =
-    selected?.status === "draft" || selected?.status === "revised";
+  const canEdit = selected != null;
 
   function openProposal(id: string) {
     const p = proposals.find((x) => x.id === id);

@@ -3,7 +3,12 @@
 import { Button } from "@heroui/react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { generateMonthlyReport, publishReport } from "@/app/actions/reports";
+import {
+  deleteReport,
+  generateMonthlyReport,
+  publishReport,
+  updateReport,
+} from "@/app/actions/reports";
 
 type ClientOption = { id: string; name: string };
 
@@ -105,30 +110,69 @@ export function ReportsPanel({
               key={r.id}
               className="rounded-xl border border-border bg-surface p-3"
             >
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium">
-                  {r.client.name} ·{" "}
-                  {new Date(r.periodStart).toLocaleDateString("pt-PT")}
-                  {r.published ? " · publicado" : ""}
-                </p>
-                {!r.published ? (
+              <p className="mb-2 text-sm font-medium">
+                {r.client.name} ·{" "}
+                {new Date(r.periodStart).toLocaleDateString("pt-PT")}
+                {r.published ? " · publicado" : ""}
+              </p>
+              <form
+                className="flex flex-col gap-2"
+                action={(fd) => {
+                  startTransition(async () => {
+                    await updateReport(fd);
+                    router.refresh();
+                  });
+                }}
+              >
+                <input type="hidden" name="id" value={r.id} />
+                <textarea
+                  name="body"
+                  required
+                  rows={6}
+                  defaultValue={r.body}
+                  className="w-full rounded-lg border border-border bg-transparent px-3 py-2 text-sm"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" variant="secondary" isDisabled={pending}>
+                    Guardar
+                  </Button>
+                  {!r.published ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      isDisabled={pending}
+                      onPress={() => {
+                        startTransition(async () => {
+                          await publishReport(r.id);
+                          router.refresh();
+                        });
+                      }}
+                    >
+                      Publicar no portal
+                    </Button>
+                  ) : null}
                   <Button
+                    type="button"
                     variant="secondary"
                     isDisabled={pending}
                     onPress={() => {
+                      if (
+                        !window.confirm(
+                          `Apagar o relatório de ${r.client.name}?`,
+                        )
+                      ) {
+                        return;
+                      }
                       startTransition(async () => {
-                        await publishReport(r.id);
+                        await deleteReport(r.id);
                         router.refresh();
                       });
                     }}
                   >
-                    Publicar no portal
+                    Apagar
                   </Button>
-                ) : null}
-              </div>
-              <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-xs text-muted">
-                {r.body}
-              </pre>
+                </div>
+              </form>
             </li>
           ))}
         </ul>

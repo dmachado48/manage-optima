@@ -279,9 +279,6 @@ export async function updateProposalDraft(
     },
   });
   if (!proposal) throw new Error("Proposta não encontrada");
-  if (proposal.status !== "draft" && proposal.status !== "revised") {
-    throw new Error("Só é possível editar drafts ou revisões");
-  }
 
   const templateHtml =
     proposal.template?.htmlLayout ?? WEBITON_PROPOSAL_TEMPLATE_HTML;

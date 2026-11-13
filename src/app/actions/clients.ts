@@ -241,6 +241,19 @@ export async function updateContract(contractId: string, formData: FormData) {
   revalidatePath("/settings");
 }
 
+export async function deleteContract(contractId: string) {
+  await requireAdmin();
+  const existing = await prisma.contract.findUnique({
+    where: { id: contractId },
+  });
+  if (!existing) throw new Error("Contrato não encontrado");
+
+  await prisma.contract.delete({ where: { id: contractId } });
+
+  revalidateClient(existing.clientId);
+  revalidatePath("/settings");
+}
+
 export async function deactivateContract(contractId: string) {
   await requireAdmin();
   const existing = await prisma.contract.findUnique({

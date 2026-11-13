@@ -12,8 +12,10 @@ import {
   setProjectStatusFromProjects,
   updateBuildTaskHours,
   updateBuildTaskStatusForm,
+  updateBuildTaskTitle,
   updateProjectDetails,
 } from "@/app/actions/projects";
+import { deleteProject } from "@/app/actions/commercial";
 import { formatDatePt, formatMinutes } from "@/lib/dates";
 import type { ProjectFinance } from "@/lib/project-finance";
 
@@ -167,6 +169,26 @@ export function ProjectDesk({
                   Faturado {formatDatePt(new Date(project.billedAt))}
                 </span>
               ) : null}
+              <button
+                type="button"
+                disabled={pending}
+                className="rounded-lg border border-red-500/30 px-3 py-2 text-xs text-red-600 hover:bg-red-500/10 disabled:opacity-50"
+                onClick={() => {
+                  if (
+                    !window.confirm(
+                      `Apagar o projeto «${project.title}»? Propostas e tarefas também são apagadas.`,
+                    )
+                  ) {
+                    return;
+                  }
+                  startTransition(async () => {
+                    await deleteProject(project.id);
+                    router.push("/projects");
+                  });
+                }}
+              >
+                Apagar projeto
+              </button>
             </div>
           </div>
         </div>
@@ -285,9 +307,29 @@ export function ProjectDesk({
                         className="rounded-md border border-border bg-surface p-2"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium leading-snug">
-                            {t.title}
-                          </p>
+                          <form
+                            className="min-w-0 flex-1"
+                            action={(fd) => {
+                              run(async () => {
+                                await updateBuildTaskTitle(fd);
+                              });
+                            }}
+                          >
+                            <input type="hidden" name="taskId" value={t.id} />
+                            <input
+                              name="title"
+                              required
+                              defaultValue={t.title}
+                              aria-label="Título da tarefa"
+                              className="w-full rounded border border-transparent bg-transparent text-sm font-medium leading-snug hover:border-border focus:border-border focus:px-1"
+                              onBlur={(e) => {
+                                const next = e.currentTarget.value.trim();
+                                if (next && next !== t.title) {
+                                  e.currentTarget.form?.requestSubmit();
+                                }
+                              }}
+                            />
+                          </form>
                           <button
                             type="button"
                             disabled={pending}
@@ -383,7 +425,7 @@ export function ProjectDesk({
         </section>
       </div>
 
-      <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-20 lg:w-80 lg:self-start">
+      <aside className="w-full shrink-0 space-y-4 lg:sticky lg:top-28 lg:w-80 lg:self-start">
         <section className="rounded-xl border border-border bg-surface p-4">
           <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted">
             Informação

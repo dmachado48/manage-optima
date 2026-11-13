@@ -12,6 +12,7 @@ import {
   setInterventionBillingStatusForm,
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
+import { InterventionEditButton } from "@/components/intervention-edit-button";
 import { MultiSelect } from "@/components/multi-select";
 import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 import {
@@ -508,6 +509,10 @@ export function FinanceDesk({
                     </td>
                     <td className="px-3 py-2.5 text-right">
                       <div className="flex flex-wrap items-center justify-end gap-1">
+                        <InterventionEditButton
+                          intervention={i}
+                          disabled={pending}
+                        />
                         {i.billingStatus === "billable" ? (
                           <button
                             type="button"

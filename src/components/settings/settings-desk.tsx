@@ -7,6 +7,7 @@ import { useMemo, useState, useTransition } from "react";
 import {
   createContract,
   deactivateContract,
+  deleteContract,
   updateContract,
 } from "@/app/actions/clients";
 import { upsertFinanceYear } from "@/app/actions/finance";
@@ -19,6 +20,7 @@ import {
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
 import { markContractBilled } from "@/app/actions/commercial";
+import { InterventionEditButton } from "@/components/intervention-edit-button";
 import { MultiSelect } from "@/components/multi-select";
 import { PlatformPanels } from "@/components/settings/platform-panels";
 import {
@@ -557,6 +559,23 @@ export function SettingsDesk({
                             Desativar
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          disabled={pending}
+                          className="rounded-md border border-border px-2 py-1 text-xs text-red-600 hover:bg-red-500/10 disabled:opacity-50"
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Apagar o contrato de ${c.client.name} (${TYPE_LABEL[c.type]})? Esta ação não se pode desfazer.`,
+                              )
+                            ) {
+                              return;
+                            }
+                            run(() => deleteContract(c.id));
+                          }}
+                        >
+                          Apagar
+                        </button>
                         {!c.billedAt &&
                         c.type !== "hourly" &&
                         c.hoursUsed >= c.hoursTotal &&
@@ -1301,6 +1320,11 @@ export function SettingsDesk({
                         {i.batchCode ?? "—"}
                       </td>
                       <td className="px-3 py-2.5 text-right">
+                        <div className="flex flex-wrap justify-end gap-1">
+                        <InterventionEditButton
+                          intervention={i}
+                          disabled={pending}
+                        />
                         {i.billingStatus === "billable" ? (
                           <button
                             type="button"
@@ -1370,6 +1394,7 @@ export function SettingsDesk({
                         >
                           Apagar
                         </button>
+                        </div>
                       </td>
                     </tr>
                   ))

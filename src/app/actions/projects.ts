@@ -57,6 +57,19 @@ export async function updateBuildTaskStatusForm(
   await updateBuildTaskStatus(taskId, status);
 }
 
+export async function updateBuildTaskTitle(formData: FormData) {
+  await requireAdmin();
+  const taskId = String(formData.get("taskId") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  if (!taskId || !title) throw new Error("Título obrigatório");
+
+  const task = await prisma.buildTask.update({
+    where: { id: taskId },
+    data: { title },
+  });
+  revalidateProject(task.projectId);
+}
+
 export async function updateBuildTaskHours(formData: FormData) {
   await requireAdmin();
   const taskId = String(formData.get("taskId") ?? "");

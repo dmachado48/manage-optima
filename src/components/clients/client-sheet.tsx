@@ -7,8 +7,10 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   createContract,
   deleteClient,
+  deleteContract,
   setClientActive,
   updateClient,
+  updateContract,
 } from "@/app/actions/clients";
 import {
   deleteIntervention,
@@ -16,6 +18,7 @@ import {
   setInterventionBillingStatusForm,
   setInterventionsBillingStatus,
 } from "@/app/actions/interventions";
+import { InterventionEditButton } from "@/components/intervention-edit-button";
 import { MultiSelect } from "@/components/multi-select";
 import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 import {
@@ -384,6 +387,8 @@ export function ClientSheet({
   const [dateFrom, setDateFrom] = useState(initialRange.from);
   const [dateTo, setDateTo] = useState(initialRange.to);
   const [showPackModal, setShowPackModal] = useState(false);
+  const [editingContract, setEditingContract] =
+    useState<ClientContractRow | null>(null);
   const [packType, setPackType] = useState<"pack" | "retainer" | "hourly">(
     "pack",
   );
@@ -591,6 +596,24 @@ export function ClientSheet({
       await action();
       router.refresh();
     });
+  }
+
+  function openContractEditor(contract: ClientContractRow) {
+    setEditingContract(contract);
+    setPackType(contract.type);
+    setPackHours(contract.hoursTotal);
+    setShowPackModal(true);
+  }
+
+  function removeContract(contract: ClientContractRow) {
+    if (
+      !window.confirm(
+        `Apagar o contrato ${TYPE_LABEL[contract.type]}? Esta ação não se pode desfazer.`,
+      )
+    ) {
+      return;
+    }
+    run(() => deleteContract(contract.id));
   }
 
   function toggleSelectAllVisible() {
@@ -1064,19 +1087,25 @@ export function ClientSheet({
                         </form>
                       </td>
                       <td className="px-3 py-2.5 text-right">
-                        <button
-                          type="button"
-                          disabled={pending}
-                          className="rounded-md border border-border px-2 py-1 text-xs text-red-600 hover:bg-red-500/10 disabled:opacity-50"
-                          onClick={() =>
-                            removeInterventions(
-                              [i.id],
-                              `Apagar a intervenção «${i.requestTitle}»?`,
-                            )
-                          }
-                        >
-                          Apagar
-                        </button>
+                        <div className="flex flex-wrap justify-end gap-1">
+                          <InterventionEditButton
+                            intervention={i}
+                            disabled={pending}
+                          />
+                          <button
+                            type="button"
+                            disabled={pending}
+                            className="rounded-md border border-border px-2 py-1 text-xs text-red-600 hover:bg-red-500/10 disabled:opacity-50"
+                            onClick={() =>
+                              removeInterventions(
+                                [i.id],
+                                `Apagar a intervenção «${i.requestTitle}»?`,
+                              )
+                            }
+                          >
+                            Apagar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1278,7 +1307,12 @@ export function ClientSheet({
             <button
               type="button"
               className="rounded-md border border-border px-2 py-1 text-[11px] uppercase tracking-wide hover:bg-default"
-              onClick={() => setShowPackModal(true)}
+              onClick={() => {
+                setEditingContract(null);
+                setPackType("pack");
+                setPackHours(10);
+                setShowPackModal(true);
+              }}
             >
               {active ? "Novo pack" : "Adicionar pack"}
             </button>
@@ -1312,13 +1346,38 @@ export function ClientSheet({
                   Desde {formatDatePt(new Date(active.startsAt))}
                 </p>
               ) : null}
+              <div className="flex flex-wrap gap-2 pt-2">
+                <button
+                  type="button"
+                  className="rounded-md border border-border px-2 py-1 text-xs hover:bg-default"
+                  onClick={() => openContractEditor(active)}
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-red-600 hover:bg-red-500/10 disabled:opacity-50"
+                  onClick={() => removeContract(active)}
+                >
+                  Apagar
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-muted">
                 Este cliente ainda não tem pack, avença ou tarifa à hora.
               </p>
-              <Button variant="primary" onPress={() => setShowPackModal(true)}>
+              <Button
+                variant="primary"
+                onPress={() => {
+                  setEditingContract(null);
+                  setPackType("pack");
+                  setPackHours(10);
+                  setShowPackModal(true);
+                }}
+              >
                 Adicionar contrato
               </Button>
             </div>
@@ -1365,6 +1424,23 @@ export function ClientSheet({
                         : c.active
                           ? ""
                           : " → inativo"}
+                    </span>
+                    <span className="mt-1 flex gap-2">
+                      <button
+                        type="button"
+                        className="underline-offset-2 hover:underline"
+                        onClick={() => openContractEditor(c)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={pending}
+                        className="text-red-600 underline-offset-2 hover:underline disabled:opacity-50"
+                        onClick={() => removeContract(c)}
+                      >
+                        Apagar
+                      </button>
                     </span>
                   </li>
                 ))}
@@ -1465,35 +1541,50 @@ export function ClientSheet({
 
       {showPackModal ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-xl bg-surface p-4 shadow-xl">
+          <div className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-xl bg-surface p-4 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-medium">
-                {active ? "Novo pack / contrato" : "Adicionar pack"}
+                {editingContract
+                  ? "Editar contrato"
+                  : active
+                    ? "Novo pack / contrato"
+                    : "Adicionar pack"}
               </h2>
               <button
                 type="button"
                 className="text-sm text-muted"
-                onClick={() => setShowPackModal(false)}
+                onClick={() => {
+                  setShowPackModal(false);
+                  setEditingContract(null);
+                }}
               >
                 Fechar
               </button>
             </div>
-            {active ? (
+            {!editingContract && active ? (
               <p className="mb-3 text-xs text-muted">
                 O pack atual ({TYPE_LABEL[active.type]}) fica inativo e este
                 passa a ser o ativo.
               </p>
             ) : null}
             <form
+              key={editingContract?.id ?? "new"}
               className="flex flex-col gap-3"
               action={(fd) => {
                 run(async () => {
-                  await createContract(fd);
+                  if (editingContract) {
+                    await updateContract(editingContract.id, fd);
+                  } else {
+                    await createContract(fd);
+                  }
                   setShowPackModal(false);
+                  setEditingContract(null);
                 });
               }}
             >
-              <input type="hidden" name="clientId" value={client.id} />
+              {editingContract ? null : (
+                <input type="hidden" name="clientId" value={client.id} />
+              )}
               <div>
                 <label className="mb-1 block text-xs text-muted">Tipo</label>
                 <select
@@ -1559,6 +1650,7 @@ export function ClientSheet({
                       step="0.01"
                       min="0"
                       placeholder="ex. 800"
+                      defaultValue={editingContract?.monthlyFeeEur ?? ""}
                       className="w-full rounded-lg border border-border px-3 py-2 text-sm"
                     />
                   </div>
@@ -1569,7 +1661,9 @@ export function ClientSheet({
                     <textarea
                       name="jobDescription"
                       rows={10}
-                      defaultValue={DEFAULT_AVENCA_JOB_MD}
+                      defaultValue={
+                        editingContract?.jobDescription ?? DEFAULT_AVENCA_JOB_MD
+                      }
                       className="w-full rounded-lg border border-border px-3 py-2 font-mono text-xs leading-relaxed"
                     />
                     <p className="mt-1 text-[11px] text-muted">
@@ -1588,6 +1682,7 @@ export function ClientSheet({
                     step="0.01"
                     min="0"
                     placeholder="ex. 75"
+                    defaultValue={editingContract?.hourlyRate ?? ""}
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm"
                   />
                 </div>
@@ -1599,7 +1694,11 @@ export function ClientSheet({
                     name="startsAt"
                     type="date"
                     required
-                    defaultValue={new Date().toISOString().slice(0, 10)}
+                    defaultValue={
+                      editingContract?.startsAt
+                        ? editingContract.startsAt.slice(0, 10)
+                        : new Date().toISOString().slice(0, 10)
+                    }
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm text-foreground"
                   />
                 </div>
@@ -1608,12 +1707,51 @@ export function ClientSheet({
                   <input
                     name="endsAt"
                     type="date"
+                    defaultValue={
+                      editingContract?.endsAt
+                        ? editingContract.endsAt.slice(0, 10)
+                        : ""
+                    }
                     className="w-full rounded-lg border border-border px-3 py-2 text-sm text-foreground"
                   />
                 </div>
               </div>
+              {editingContract ? (
+                <>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted">
+                      Horas já usadas
+                    </label>
+                    <input
+                      name="hoursUsed"
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      defaultValue={editingContract.hoursUsed}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted">
+                      Estado
+                    </label>
+                    <select
+                      name="active"
+                      defaultValue={editingContract.active ? "true" : "false"}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-sm"
+                    >
+                      <option value="true">Ativo</option>
+                      <option value="false">Inativo</option>
+                    </select>
+                  </div>
+                </>
+              ) : null}
               <Button type="submit" variant="primary" isDisabled={pending}>
-                {active ? "Ativar novo contrato" : "Adicionar contrato"}
+                {editingContract
+                  ? "Guardar contrato"
+                  : active
+                    ? "Ativar novo contrato"
+                    : "Adicionar contrato"}
               </Button>
             </form>
           </div>

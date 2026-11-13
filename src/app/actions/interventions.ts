@@ -218,6 +218,64 @@ export async function setInterventionBillingStatus(
   revalidateInterventionPaths(updated.clientId);
 }
 
+/** Correct a logged intervention. Pack/avença hours move with the minute delta. */
+export async function updateIntervention(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  if (!id) throw new Error("Registo não encontrado");
+
+  const platform = await getPlatformConfig();
+  const amountRaw = String(formData.get("agreedAmountEur") ?? "").trim();
+  let { minutes, agreedAmountEur } = assertCloseableBilling({
+    minutes: Number(formData.get("minutes") ?? 0),
+    agreedAmountEur: amountRaw ? Number(amountRaw) : null,
+  });
+  if (minutes > 0) {
+    minutes = roundLoggedMinutes(minutes, platform);
+  }
+
+  const note = String(formData.get("note") ?? "").trim() || null;
+  const performedAt = new Date(String(formData.get("performedAt") ?? ""));
+  if (Number.isNaN(performedAt.getTime())) {
+    throw new Error("Data inválida");
+  }
+
+  const existing = await prisma.intervention.findUnique({ where: { id } });
+  if (!existing) throw new Error("Registo não encontrado");
+
+  await prisma.$transaction(async (tx) => {
+    if (existing.billingStatus === "included" && minutes !== existing.minutes) {
+      const found = await tx.contract.findFirst({
+        where: { clientId: existing.clientId, active: true },
+      });
+      const active = found ? await ensureRetainerPeriod(tx, found) : null;
+      if (active && shouldDeduct(active.type)) {
+        const delta =
+          hoursFromMinutes(minutes) - hoursFromMinutes(existing.minutes);
+        await tx.contract.update({
+          where: { id: active.id },
+          data: {
+            hoursUsed: Math.max(0, Number(active.hoursUsed) + delta),
+          },
+        });
+      }
+    }
+
+    await tx.intervention.update({
+      where: { id },
+      data: {
+        minutes,
+        agreedAmountEur:
+          agreedAmountEur != null ? agreedAmountEur.toFixed(2) : null,
+        note,
+        performedAt,
+      },
+    });
+  });
+
+  revalidateInterventionPaths(existing.clientId);
+}
+
 export async function setInterventionBillingStatusForm(
   interventionId: string,
   formData: FormData,

@@ -73,6 +73,35 @@ export async function generateMonthlyReport(formData: FormData) {
   return { id: report.id, batchCode: report.batchCode, body };
 }
 
+export async function updateReport(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id") ?? "");
+  const body = String(formData.get("body") ?? "");
+  if (!id) throw new Error("Relatório não encontrado");
+  if (!body.trim()) throw new Error("O relatório não pode ficar vazio");
+
+  const report = await prisma.report.update({
+    where: { id },
+    data: { body },
+    include: { client: { select: { kanbanShareToken: true } } },
+  });
+  revalidatePath("/maintenance");
+  revalidatePath(`/k/${report.client.kanbanShareToken}`);
+}
+
+export async function deleteReport(reportId: string) {
+  await requireAdmin();
+  const report = await prisma.report.findUnique({
+    where: { id: reportId },
+    include: { client: { select: { kanbanShareToken: true } } },
+  });
+  if (!report) throw new Error("Relatório não encontrado");
+
+  await prisma.report.delete({ where: { id: reportId } });
+  revalidatePath("/maintenance");
+  revalidatePath(`/k/${report.client.kanbanShareToken}`);
+}
+
 export async function publishReport(reportId: string) {
   await requireAdmin();
   const report = await prisma.report.update({
