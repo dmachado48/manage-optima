@@ -86,7 +86,7 @@ export const CONTRACT_TYPE_LABELS: Record<
 > = {
   retainer: "Avença",
   pack: "Pack",
-  hourly: "Horário",
+  hourly: "À hora",
 };
 
 export const DEFAULT_AVENCA_JOB_MD = `# Âmbito da avença

@@ -158,6 +158,12 @@ textarea::placeholder {
   transition: width 0.35s ease;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .pulse-bar-fill {
+    transition: none;
+  }
+}
+
 .pulse-chip {
   display: inline-flex;
   align-items: center;

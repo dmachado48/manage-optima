@@ -156,7 +156,7 @@ export function QuickLogForm({
             )
           }
         >
-          <option value="">Automático (pack / horário)</option>
+          <option value="">Automático (pack ou à hora)</option>
           <option value="included">Incluída no pack</option>
           <option value="billable">Por faturar</option>
           <option value="non_billable">Não faturável</option>
@@ -165,10 +165,14 @@ export function QuickLogForm({
       </label>
 
       {error ? (
-        <Chip className="bg-danger-soft text-danger">{error}</Chip>
+        <Chip className="bg-danger-soft text-danger" aria-live="polite">
+          {error}
+        </Chip>
       ) : null}
       {ok ? (
-        <p className="text-xs text-green-700">Intervenção guardada.</p>
+        <p className="text-xs text-green-700" aria-live="polite">
+          Intervenção guardada.
+        </p>
       ) : null}
 
       <Button

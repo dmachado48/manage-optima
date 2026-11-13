@@ -48,15 +48,19 @@ const FLOW = COLUMNS.map((c) => c.key);
 function RequestCard({
   request,
   showClient,
+  showSource,
   interactive,
   onOpen,
   onDelete,
+  onMove,
 }: {
   request: KanbanRequest;
   showClient: boolean;
+  showSource: boolean;
   interactive: boolean;
   onOpen: () => void;
   onDelete?: () => void;
+  onMove?: (status: KanbanRequest["status"]) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -68,6 +72,13 @@ function RequestCard({
   const style = transform
     ? { transform: CSS.Translate.toString(transform) }
     : undefined;
+  const meta = [
+    showClient ? request.client.name : null,
+    showSource ? request.source : null,
+    request.messageCount ? `${request.messageCount} msg` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div
@@ -88,13 +99,11 @@ function RequestCard({
         <p className="line-clamp-2 break-words text-xs font-medium leading-snug">
           {request.title}
         </p>
-        <p className="mt-1 truncate text-[10px] text-muted">
-          {showClient ? `${request.client.name} · ` : ""}
-          {request.source}
-          {request.messageCount ? ` · ${request.messageCount} msg` : ""}
-        </p>
+        {meta ? (
+          <p className="mt-1 truncate text-[10px] text-muted">{meta}</p>
+        ) : null}
       </button>
-      <div className="mt-2 flex gap-1">
+      <div className="mt-2 flex items-center gap-1">
         <button
           type="button"
           className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted"
@@ -103,6 +112,25 @@ function RequestCard({
         >
           Abrir
         </button>
+        {onMove ? (
+          <select
+            aria-label={`Mover «${request.title}»`}
+            value={request.status}
+            className="ml-auto max-w-[7.5rem] rounded border border-border bg-surface px-1 py-1 text-[11px]"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const next = e.target.value as KanbanRequest["status"];
+              if (next !== request.status) onMove(next);
+            }}
+          >
+            {COLUMNS.map((col) => (
+              <option key={col.key} value={col.key}>
+                {col.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
         {onDelete ? (
           <button
             type="button"
@@ -123,17 +151,21 @@ function Column({
   label,
   items,
   showClient,
+  showSource,
   interactive,
   onOpen,
   onDelete,
+  onMove,
 }: {
   status: KanbanRequest["status"];
   label: string;
   items: KanbanRequest[];
   showClient: boolean;
+  showSource: boolean;
   interactive: boolean;
   onOpen: (id: string) => void;
   onDelete?: (id: string) => void;
+  onMove?: (id: string, status: KanbanRequest["status"]) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -161,9 +193,11 @@ function Column({
             <RequestCard
               request={r}
               showClient={showClient}
+              showSource={showSource}
               interactive={interactive}
               onOpen={() => onOpen(r.id)}
               onDelete={onDelete ? () => onDelete(r.id) : undefined}
+              onMove={onMove ? (status) => onMove(r.id, status) : undefined}
             />
           </li>
         ))}
@@ -279,9 +313,11 @@ export function ClientWorkBoard({
           label={col.label}
           items={byStatus[col.key]}
           showClient={false}
+          showSource={interactive}
           interactive={interactive}
           onOpen={setOpenRequestId}
           onDelete={interactive ? removeRequest : undefined}
+          onMove={interactive ? moveTo : undefined}
         />
       ))}
     </div>

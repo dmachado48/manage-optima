@@ -91,7 +91,7 @@ export function IdleNudge({
       <Card className="border border-border p-3 shadow-lg">
         <p className="mb-2 text-sm font-medium">Algo para registar?</p>
         <p className="mb-3 text-xs text-muted">
-          Passou algum tempo. Abre o Quick Log se fizeste trabalho de manutenção.
+          Passou algum tempo. Abre o registo se fizeste trabalho de manutenção.
         </p>
         <div className="flex gap-2">
           <Button

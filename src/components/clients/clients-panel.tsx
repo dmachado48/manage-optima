@@ -450,7 +450,7 @@ export function ClientsPanel({ clients }: { clients: ClientRow[] }) {
                 >
                   <option value="pack">Pack</option>
                   <option value="retainer">Avença (mensal)</option>
-                  <option value="hourly">Horário</option>
+                  <option value="hourly">À hora</option>
                 </select>
                 <input
                   name="hoursTotal"

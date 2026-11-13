@@ -3,14 +3,17 @@
 import { Button } from "@heroui/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   createContract,
   deleteClient,
   setClientActive,
   updateClient,
 } from "@/app/actions/clients";
-import { setInterventionBillingStatusForm } from "@/app/actions/interventions";
+import {
+  setInterventionBillingStatusForm,
+  setInterventionsBillingStatus,
+} from "@/app/actions/interventions";
 import { RequestDetailModal } from "@/components/pipeline/request-detail-modal";
 import {
   CONTRACT_TYPE_LABELS,
@@ -77,6 +80,16 @@ const STATUS_COLOR: Record<ClientRequestRow["status"], string> = {
 };
 
 const TYPE_LABEL = CONTRACT_TYPE_LABELS;
+
+const BILLING_FILTERS = [
+  ["billable", "Por faturar"],
+  ["billed", "Faturadas"],
+  ["included", "Pack"],
+  ["non_billable", "Não faturável"],
+  ["all", "Todas"],
+] as const;
+
+type BillingFilter = (typeof BILLING_FILTERS)[number][0];
 
 const SOURCE_LABEL: Record<string, string> = {
   email: "Email",
@@ -376,6 +389,11 @@ export function ClientSheet({
   );
   const [packHours, setPackHours] = useState(10);
   const [openRequestId, setOpenRequestId] = useState<string | null>(null);
+  const [billingFilter, setBillingFilter] = useState<BillingFilter>("billable");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] =
+    useState<keyof typeof INTERVENTION_BILLING_LABELS>("billed");
+  const [bulkError, setBulkError] = useState<string | null>(null);
   const active = (contracts ?? []).find((c) => c.active);
   const periodActive = Boolean(dateFrom || dateTo);
 
@@ -411,6 +429,47 @@ export function ClientSheet({
     () => filteredInterventions.reduce((s, i) => s + i.minutes, 0),
     [filteredInterventions],
   );
+
+  const listedInterventions = useMemo(() => {
+    if (billingFilter === "all") return filteredInterventions;
+    return filteredInterventions.filter(
+      (i) => i.billingStatus === billingFilter,
+    );
+  }, [filteredInterventions, billingFilter]);
+
+  const listedMinutes = useMemo(
+    () => listedInterventions.reduce((s, i) => s + i.minutes, 0),
+    [listedInterventions],
+  );
+
+  const billingCounts = useMemo(() => {
+    const counts: Record<BillingFilter, number> = {
+      all: filteredInterventions.length,
+      billable: 0,
+      billed: 0,
+      included: 0,
+      non_billable: 0,
+    };
+    for (const i of filteredInterventions) counts[i.billingStatus] += 1;
+    return counts;
+  }, [filteredInterventions]);
+
+  const visibleIds = useMemo(
+    () => listedInterventions.map((i) => i.id),
+    [listedInterventions],
+  );
+  const selectedVisible = useMemo(
+    () => listedInterventions.filter((i) => selectedIds.includes(i.id)),
+    [listedInterventions, selectedIds],
+  );
+  const allVisibleSelected =
+    visibleIds.length > 0 && visibleIds.every((id) => selectedIds.includes(id));
+  const someVisibleSelected = visibleIds.some((id) => selectedIds.includes(id));
+
+  useEffect(() => {
+    setSelectedIds([]);
+    setBulkError(null);
+  }, [dateFrom, dateTo, billingFilter]);
 
   const periodStatusCounts = useMemo((): StatusCount[] => {
     const pool = periodActive
@@ -532,6 +591,37 @@ export function ClientSheet({
     startTransition(async () => {
       await action();
       router.refresh();
+    });
+  }
+
+  function toggleSelectAllVisible() {
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
+      return;
+    }
+    setSelectedIds((prev) => [...new Set([...prev, ...visibleIds])]);
+  }
+
+  function toggleSelectOne(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function applyBulkStatus() {
+    const ids = selectedVisible.map((i) => i.id);
+    if (ids.length === 0) return;
+    setBulkError(null);
+    startTransition(async () => {
+      try {
+        await setInterventionsBillingStatus(ids, bulkStatus);
+        setSelectedIds([]);
+        router.refresh();
+      } catch (e) {
+        setBulkError(
+          e instanceof Error ? e.message : "Erro ao atualizar o estado",
+        );
+      }
     });
   }
 
@@ -672,9 +762,29 @@ export function ClientSheet({
               </button>
             ) : null}
           </div>
+          <div className="flex flex-wrap gap-1 rounded-lg bg-default p-0.5 text-xs">
+            {BILLING_FILTERS.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setBillingFilter(key)}
+                className={
+                  billingFilter === key
+                    ? "rounded-sm bg-foreground/10 px-2 py-1 font-medium text-foreground"
+                    : "rounded-sm px-2 py-1 text-muted hover:text-foreground"
+                }
+              >
+                {label} ({billingCounts[key]})
+              </button>
+            ))}
+          </div>
           <p className="ml-auto text-xs text-muted">
-            {filteredInterventions.length} interv. ·{" "}
-            {formatMinutes(filteredMinutes)}
+            {listedInterventions.length} interv.
+            {billingFilter !== "all"
+              ? ` · ${INTERVENTION_BILLING_LABELS[billingFilter].toLowerCase()}`
+              : ""}
+            {" · "}
+            {formatMinutes(listedMinutes)}
           </p>
         </section>
 
@@ -731,24 +841,108 @@ export function ClientSheet({
             <h2 className="text-sm font-medium">
               Histórico de intervenções
               {periodActive ? " no período" : ""}
+              {billingFilter !== "all"
+                ? ` · ${INTERVENTION_BILLING_LABELS[billingFilter].toLowerCase()}`
+                : ""}
             </h2>
-            <Link
-              href="/finance"
-              className="text-xs text-muted underline-offset-2 hover:underline"
-            >
-              Abrir financeiro
-            </Link>
+            <div className="flex items-center gap-3">
+              {listedInterventions.length > 0 ? (
+                <button
+                  type="button"
+                  className="text-xs text-muted underline-offset-2 hover:underline"
+                  onClick={toggleSelectAllVisible}
+                >
+                  {allVisibleSelected ? "Limpar seleção" : "Selecionar todas"}
+                </button>
+              ) : null}
+              <Link
+                href="/finance"
+                className="text-xs text-muted underline-offset-2 hover:underline"
+              >
+                Abrir financeiro
+              </Link>
+            </div>
           </div>
-          {filteredInterventions.length === 0 ? (
+          {selectedVisible.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2">
+              <span className="text-sm font-medium">
+                {selectedVisible.length} selecionada(s)
+              </span>
+              <span className="text-xs tabular-nums text-muted">
+                {formatMinutes(
+                  selectedVisible.reduce((s, i) => s + i.minutes, 0),
+                )}
+              </span>
+              <select
+                value={bulkStatus}
+                onChange={(e) =>
+                  setBulkStatus(
+                    e.target.value as keyof typeof INTERVENTION_BILLING_LABELS,
+                  )
+                }
+                disabled={pending}
+                className="rounded-md border border-border px-2 py-1 text-xs"
+              >
+                {Object.entries(INTERVENTION_BILLING_LABELS).map(
+                  ([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ),
+                )}
+              </select>
+              <Button
+                variant="primary"
+                isDisabled={pending}
+                onPress={applyBulkStatus}
+              >
+                Aplicar estado
+              </Button>
+              <button
+                type="button"
+                className="text-xs text-muted underline-offset-2 hover:underline"
+                onClick={() => {
+                  setSelectedIds([]);
+                  setBulkError(null);
+                }}
+              >
+                Limpar
+              </button>
+              {bulkError ? (
+                <p className="w-full text-xs text-danger">{bulkError}</p>
+              ) : null}
+            </div>
+          ) : null}
+          {listedInterventions.length === 0 ? (
             <p className="px-4 py-4 text-sm text-muted">
-              Sem intervenções
-              {periodActive ? " neste período" : " registadas"}.
+              {billingFilter === "billable"
+                ? periodActive
+                  ? "Sem intervenções por faturar neste período."
+                  : "Sem intervenções por faturar."
+                : periodActive
+                  ? "Sem intervenções neste período."
+                  : "Sem intervenções registadas."}
             </p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[36rem] text-left text-sm">
+              <table className="w-full min-w-[40rem] text-left text-sm">
                 <thead className="border-b border-border text-xs text-muted">
                   <tr>
+                    <th className="w-10 px-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        ref={(el) => {
+                          if (el) {
+                            el.indeterminate =
+                              someVisibleSelected && !allVisibleSelected;
+                          }
+                        }}
+                        onChange={toggleSelectAllVisible}
+                        aria-label="Selecionar todas as intervenções visíveis"
+                        className="size-3.5 accent-foreground"
+                      />
+                    </th>
                     <th className="px-3 py-2 font-medium">Pedido</th>
                     <th className="px-3 py-2 font-medium">Tempo</th>
                     <th className="px-3 py-2 font-medium">Valor</th>
@@ -757,11 +951,24 @@ export function ClientSheet({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredInterventions.map((i) => (
+                  {listedInterventions.map((i) => (
                     <tr
                       key={i.id}
-                      className="border-b border-separator last:border-0"
+                      className={
+                        selectedIds.includes(i.id)
+                          ? "border-b border-separator bg-default/40 last:border-0"
+                          : "border-b border-separator last:border-0"
+                      }
                     >
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(i.id)}
+                          onChange={() => toggleSelectOne(i.id)}
+                          aria-label={`Selecionar ${i.requestTitle}`}
+                          className="size-3.5 accent-foreground"
+                        />
+                      </td>
                       <td className="px-3 py-2.5">
                         <p className="font-medium leading-snug">
                           {i.requestTitle}
@@ -792,6 +999,7 @@ export function ClientSheet({
                           }}
                         >
                           <select
+                            key={i.billingStatus}
                             name="billingStatus"
                             defaultValue={i.billingStatus}
                             disabled={pending}
@@ -1048,7 +1256,7 @@ export function ClientSheet({
           ) : (
             <div className="space-y-2">
               <p className="text-sm text-muted">
-                Este cliente ainda não tem pack, avença ou horário ativo.
+                Este cliente ainda não tem pack, avença ou tarifa à hora.
               </p>
               <Button variant="primary" onPress={() => setShowPackModal(true)}>
                 Adicionar contrato
@@ -1086,7 +1294,7 @@ export function ClientSheet({
                       {c.active ? " · ativo" : ""}
                     </span>
                     <span className="block text-muted">
-                      {c.type === "hourly" ? "horário" : `${c.hoursTotal}h`}
+                      {c.type === "hourly" ? "à hora" : `${c.hoursTotal}h`}
                       {c.hourlyRate != null
                         ? ` · ${c.hourlyRate.toFixed(0)} €/h`
                         : ""}
@@ -1241,7 +1449,7 @@ export function ClientSheet({
                 >
                   <option value="pack">Pack (horas pré-pagas)</option>
                   <option value="retainer">Avença (mensal, sem rollover)</option>
-                  <option value="hourly">Horário (à hora)</option>
+                  <option value="hourly">À hora</option>
                 </select>
               </div>
               {packType !== "hourly" ? (

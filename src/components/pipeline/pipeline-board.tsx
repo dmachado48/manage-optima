@@ -51,12 +51,14 @@ function RequestCard({
   interactive,
   onOpen,
   onDelete,
+  onMove,
 }: {
   request: PipelineRequest;
   showClient: boolean;
   interactive: boolean;
   onOpen: () => void;
   onDelete?: () => void;
+  onMove?: (status: PipelineRequest["status"]) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -93,7 +95,7 @@ function RequestCard({
           {request.messageCount ? ` · ${request.messageCount} msg` : ""}
         </p>
       </button>
-      <div className="mt-2 flex gap-1">
+      <div className="mt-2 flex items-center gap-1">
         <button
           type="button"
           className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted"
@@ -102,6 +104,25 @@ function RequestCard({
         >
           Abrir
         </button>
+        {onMove ? (
+          <select
+            aria-label={`Mover «${request.title}»`}
+            value={request.status}
+            className="ml-auto max-w-[7.5rem] rounded border border-border bg-surface px-1 py-1 text-[11px]"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) => {
+              const next = e.target.value as PipelineRequest["status"];
+              if (next !== request.status) onMove(next);
+            }}
+          >
+            {COLUMNS.map((col) => (
+              <option key={col.key} value={col.key}>
+                {col.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
         {onDelete ? (
           <button
             type="button"
@@ -125,6 +146,7 @@ function Column({
   interactive,
   onOpen,
   onDelete,
+  onMove,
 }: {
   status: PipelineRequest["status"];
   label: string;
@@ -133,6 +155,7 @@ function Column({
   interactive: boolean;
   onOpen: (id: string) => void;
   onDelete?: (id: string) => void;
+  onMove?: (id: string, status: PipelineRequest["status"]) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -163,6 +186,7 @@ function Column({
               interactive={interactive}
               onOpen={() => onOpen(r.id)}
               onDelete={onDelete ? () => onDelete(r.id) : undefined}
+              onMove={onMove ? (status) => onMove(r.id, status) : undefined}
             />
           </li>
         ))}
@@ -324,6 +348,7 @@ export function PipelineBoard({
                 interactive
                 onOpen={setOpenRequestId}
                 onDelete={removeRequest}
+                onMove={moveTo}
               />
             ))}
           </div>

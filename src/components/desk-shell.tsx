@@ -156,10 +156,11 @@ export function DeskShell({
                   <Link
                     key={m.href}
                     href={m.href}
+                    aria-current={active ? "page" : undefined}
                     className={
                       active
-                        ? "rounded-lg bg-[color-mix(in_oklab,var(--blue-600)_28%,transparent)] px-3 py-2 text-sm font-medium text-[var(--blue-100)]"
-                        : "rounded-lg px-3 py-2 text-sm text-muted hover:bg-[color-mix(in_oklab,var(--blue-900)_40%,transparent)] hover:text-[var(--blue-200)]"
+                        ? "rounded-lg bg-[color-mix(in_oklab,var(--blue-600)_12%,white)] px-3 py-2 text-sm font-medium text-[var(--blue-950)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue-700)]"
+                        : "rounded-lg px-3 py-2 text-sm text-muted hover:bg-[color-mix(in_oklab,var(--blue-600)_8%,white)] hover:text-[var(--blue-900)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--blue-700)]"
                     }
                   >
                     {m.label}
@@ -175,17 +176,18 @@ export function DeskShell({
           </div>
         </div>
 
-        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-around border-t border-border bg-surface/95 px-1 py-2 backdrop-blur md:hidden">
+        <nav className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-border bg-surface/95 px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
           {MODULES.map((m) => {
             const active = isActive(pathname, m.href);
             return (
               <Link
                 key={m.href}
                 href={m.href}
+                aria-current={active ? "page" : undefined}
                 className={
                   active
-                    ? "rounded-md px-1.5 py-1 text-[11px] font-semibold"
-                    : "rounded-md px-1.5 py-1 text-[11px] text-muted"
+                    ? "flex min-h-11 min-w-0 flex-1 items-center justify-center px-0.5 text-[11px] font-semibold text-[var(--blue-950)]"
+                    : "flex min-h-11 min-w-0 flex-1 items-center justify-center px-0.5 text-[11px] text-muted"
                 }
               >
                 {m.short}
@@ -195,7 +197,7 @@ export function DeskShell({
           <button
             type="button"
             onClick={() => openLog("voice")}
-            className="rounded-md bg-accent px-2 py-1 text-[11px] font-medium text-white"
+            className="flex min-h-11 min-w-0 flex-1 items-center justify-center px-0.5 text-[11px] font-medium text-white bg-accent"
           >
             Voz
           </button>

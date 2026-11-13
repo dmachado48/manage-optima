@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { createPortalRequest } from "@/app/actions/portal";
 import { ClientWorkBoard, type KanbanRequest } from "@/components/clients/work-board";
-import { remainingHours } from "@/lib/billing";
+import { CONTRACT_TYPE_LABELS, remainingHours } from "@/lib/billing";
 
 type ReportRow = {
   id: string;
@@ -29,7 +29,7 @@ export function ClientPortal({
   clientId: string;
   hoursTotal: number | null;
   hoursUsed: number | null;
-  contractType: string | null;
+  contractType: keyof typeof CONTRACT_TYPE_LABELS | null;
   requests: KanbanRequest[];
   reports: ReportRow[];
 }) {
@@ -53,16 +53,16 @@ export function ClientPortal({
             Portal do cliente — podes criar pedidos; o estado é atualizado pela
             Webiton.
           </p>
-          {remaining != null ? (
+          {remaining != null && contractType ? (
             <p className="mt-2 text-sm">
-              Contrato {contractType}:{" "}
-              <span className="font-medium">
-                {remaining}h restantes
-              </span>{" "}
-              de {hoursTotal}h
+              {CONTRACT_TYPE_LABELS[contractType]}:{" "}
+              <span className="font-medium">{remaining} h restantes</span> de{" "}
+              {hoursTotal} h
             </p>
           ) : (
-            <p className="mt-2 text-sm text-muted">Sem pack/retainer ativo</p>
+            <p className="mt-2 text-sm text-muted">
+              Sem pack nem avença ativos.
+            </p>
           )}
         </header>
 

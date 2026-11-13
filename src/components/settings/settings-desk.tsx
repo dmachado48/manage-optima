@@ -1787,7 +1787,7 @@ function ContractModal({
           >
             <option value="pack">Pack (bolsa até esgotar)</option>
             <option value="retainer">Avença (mensal, sem rollover)</option>
-            <option value="hourly">Horário</option>
+            <option value="hourly">À hora</option>
           </select>
           <input
             name="hoursTotal"
